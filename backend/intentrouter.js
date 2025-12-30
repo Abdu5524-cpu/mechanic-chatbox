@@ -2,6 +2,6 @@ const express = require('express');
 const router = require('express').Router();
 
 
-router.use('/chat',   require('./chat'));   // ->   /api/chat/*
+router.use('/chat',   require('../controllers/chat'));   // ->   /chat/*
 
 module.exports = router;

@@ -5,7 +5,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
-const chat = require('./controllers/chat');
+const intentrouter = require('./routes/intentrouter');
+
 
 
 
@@ -38,7 +39,7 @@ app.use(express.json());
 
 
 
-app.use('/chat', chat);
+app.use('/intentrouter', intentrouter);
 
 
 // Any cases that fall through
