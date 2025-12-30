@@ -1,64 +1,59 @@
-const express = require('express');
-const chatRoutes = require('./routes/chat'); // Import chat routes
-const cors = require('cors');
+console.log("CWD:", process.cwd());
+console.log("__dirname:", __dirname);
+
 require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const chat = require('./controllers/chat');
 
 
+
+// Initialize Express app
 const app = express();
-app.use(express.json());
-app.use(cors());
 
-app.use('/api', chatRoutes);  // ✅ Now /api/chat works
-
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
-});
 
 
 // CORS configuration
 // Allow requests from specific origins
-const allowedOrigins = [
-  'http://localhost:3001',
-  'https://mechanic-frontend.onrender.com'
-];
+const allowed = new Set(
+  (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+const corsMiddleware = cors({
+  origin(origin, cb) {
+    // allow non-browser/SSR/cURL (no Origin) and allow-all when list is empty
+    if (!origin || allowed.size === 0 || allowed.has(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
   },
-  credentials: true
-}));
+  credentials: true,
+});
 
+app.use(morgan('dev'));
+app.use(corsMiddleware);
 app.use(express.json());
 
 
-const apiRoutes = require('./routes'); // assuming index.js in routes/
-app.use('/api', apiRoutes);
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log(`Server running on port ${process.env.PORT || 3000}`)
-);
+app.use('/chat', chat);
 
-app.get('/', (req, res) => {
-  res.send('Hello World');
+
+// Any cases that fall through
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found' });
 });
 
-//verbose logging middleware
-app.use((req, res, next) => {
-  console.log(`[${req.method}] ${req.url}`);
-  next();
-});
-
-//morgan for logging HTTP requests
-const morgan = require('morgan');
-app.use(morgan('dev'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
   res.status(500).json({ error: 'Internal Server Error' });
 });
+
+app.listen(process.env.BACKEND_PORT || 3002, () =>
+  console.log(`Server running on port ${process.env.BACKEND_PORT || 3002}`)
+);

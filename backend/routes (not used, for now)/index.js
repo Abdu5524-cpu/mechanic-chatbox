@@ -2,8 +2,6 @@ const express = require('express');
 const router = require('express').Router();
 
 
-router.get('/ping', (req, res) => {
-  res.json({ message: 'pong' });
-});
+router.use('/chat',   require('./chat'));   // ->   /api/chat/*
 
 module.exports = router;

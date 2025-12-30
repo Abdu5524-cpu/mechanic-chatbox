@@ -8,7 +8,7 @@ router.post("/chat", async (req, res) => {
     const { formData } = req.body;
 
     const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-5-nano",
         messages: [{ role: "user", content: formData }],
     });
 
