@@ -1,7 +1,10 @@
-const express = require('express');
-const router = require('express').Router();
+import { Router } from "express";
+import analyzeQuoteController from "./features/analyzeQuote/analyzeQuoteController.js";
+import chatRouter from "./controllers/chat.js";
 
+const router = Router();
 
-router.use('/chat',   require('../controllers/chat'));   // ->   /chat/*
+router.post("/analyzeQuote", analyzeQuoteController.post); // -> POST /api/analyzeQuote
+router.use("/chat", chatRouter); // -> POST /api/chat
 
-module.exports = router;
+export default router;

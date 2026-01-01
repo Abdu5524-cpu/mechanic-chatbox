@@ -1,11 +1,15 @@
-console.log("CWD:", process.cwd());
-console.log("__dirname:", __dirname);
+import "dotenv/config";
+import cors from "cors";
+import express from "express";
+import morgan from "morgan";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import intentrouter from "./intentrouter.js";
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
-const intentrouter = require('./routes/intentrouter');
+console.log("CWD:", process.cwd());
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+console.log("__dirname:", __dirname);
 
 
 
@@ -33,13 +37,15 @@ const corsMiddleware = cors({
   credentials: true,
 });
 
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 app.use(corsMiddleware);
 app.use(express.json());
 
 
 
-app.use('/intentrouter', intentrouter);
+app.use("/api", intentrouter);
+// Backwards-compat for older frontend fetch paths.
+app.use("/controllers", intentrouter);
 
 
 // Any cases that fall through
