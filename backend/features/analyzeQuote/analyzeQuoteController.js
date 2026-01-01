@@ -1,21 +1,34 @@
-import OpenAI from "openai";
-const { analyzeQuote } = require("./analyzeQuoteService");
+import { analyzeQuoteService } from "./analyzeQuoteService.js";
 
 
 
 async function analyzeQuoteController(req, res, next) {
   try {
-    
-    const { input } = req.body;
+    // extract input
+    const { userText, userLocationHint } = req.body;
 
-    const result = await analyzeQuote(input);
+  //validation
+    if (!userText || typeof userText !== "string") {
+  return res.status(400).json({
+    success: false,
+    error: "userText is required and must be a string"
+  });
+}
+  //call service
+    const result = await analyzeQuoteService({ userText, userLocationHint });
+
+    if (!result || !result.success) {
+      return res.status(599).json({
+        success: false,
+        error: "service failed to analyze quote"
+      });
+    }
 
     res.json(result);
   } catch (err) {
     next(err);
   }
-    // 3) do work
-    // 4) respond
+    
 }
 
 export default analyzeQuoteController;

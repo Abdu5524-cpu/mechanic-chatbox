@@ -4,7 +4,7 @@ import chatRouter from "./controllers/chat.js";
 
 const router = Router();
 
-router.post("/analyzeQuote", analyzeQuoteController.post); // -> POST /api/analyzeQuote
+router.post("/analyzeQuote", analyzeQuoteController); // -> POST /api/analyzeQuote
 router.use("/chat", chatRouter); // -> POST /api/chat
 
 export default router;

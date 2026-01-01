@@ -61,6 +61,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-app.listen(process.env.BACKEND_PORT || 3002, () =>
+app.listen(process.env.BACKEND_PORT || 3000, () =>
   console.log(`Server running on port ${process.env.BACKEND_PORT || 3002}`)
 );
