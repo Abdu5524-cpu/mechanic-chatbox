@@ -18,17 +18,17 @@ export function extractOutput(response) {
 }
 
 // Send a prompt to the model and return a string best-effort from any response type.
-export async function generateText(systemInput, userInput, responseFormatType) {
+export async function callWrapper(systemContent, userContent, responseFormat) {
   const response = await openai.responses.create({
     model: "gpt-4.1-nano",
     input: [
-        {role: "system", content: systemInput},
-        {role: "user", content: userInput},
+        {role: "system", content: systemContent},
+        {role: "user", content: userContent},
   ],
-    response_format: { type: responseFormatType },
+    response_format: {responseFormat },
   });
 
   return extractOutput(response);
 }
 
-export default openai;
+export default callWrapper;
