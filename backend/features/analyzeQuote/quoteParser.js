@@ -1,7 +1,32 @@
 import { callWrapper } from "../../lib/callWrapper.js";
 
+function extractLocationHint(rawText) {
+    const labeled = rawText.match(/(?:location hint|location|located in)\s*:\s*([^\n]+)/i);
+    if (labeled) {
+        const userLocationHint = labeled[1].trim() || null;
+        const cleanedText = rawText.replace(labeled[0], "").trim();
+        return { cleanedText, userLocationHint };
+    }
 
-export async function quoteParser({ userText, userLocationHint = null }) {
+    // Heuristic: detect "City, ST" or "City, ST 12345" or ZIP-only patterns.
+    const patterns = [
+        /\b([A-Za-z][A-Za-z .'-]{1,},\s*[A-Z]{2})(?:\s+\d{5})?\b/g,
+        /\b\d{5}(?:-\d{4})?\b/g,
+    ];
+
+    for (const pattern of patterns) {
+        const match = [...rawText.matchAll(pattern)].pop();
+        if (match) {
+            const userLocationHint = match[1] || match[0];
+            const cleanedText = rawText.replace(match[0], "").trim();
+            return { cleanedText, userLocationHint };
+        }
+    }
+
+    return { cleanedText: rawText, userLocationHint: null };
+}
+
+export async function quoteParser({ userText }) {
 
     const systemContent = `
     Parse user text input and convert it accurately into your specified JSON schema format.
@@ -183,18 +208,20 @@ export async function quoteParser({ userText, userLocationHint = null }) {
 
 
 
-    const parsed = await callWrapper(
-        systemContent,
-        userText + (userLocationHint ? `\n\nUser location hint: ${userLocationHint}` : ""),
-        responseFormat
-    );
-
-
-    if (!parsed || typeof parsed !== "object") {
-        return null;
-    } else {
-        return parsed;
-    }
+    const { cleanedText, userLocationHint } = extractLocationHint(userText);
+    const inputText = cleanedText + (userLocationHint ? `\n\nUser location hint: ${userLocationHint}` : "");
     
+    try {
+        const parsed = await callWrapper(
+            systemContent,
+            inputText,
+            responseFormat
+        );
+
+        if (!parsed || typeof parsed !== "json_object") return null;
+        return parsed;
+    } catch (err) {
+        return {error: err.message};
+    }
 
 }

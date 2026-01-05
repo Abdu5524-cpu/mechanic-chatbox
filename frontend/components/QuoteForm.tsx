@@ -24,12 +24,13 @@ import {
 
 // Icons from lucide-react for visual cues
 import { ChevronsUpDown, Check } from 'lucide-react'
+import ChatMessage from './ChatMessage'
 
 // ------------------------------
 // Types shared across the file
 // ------------------------------
 // Chat message shape sent to/received from your /api/chat endpoint
-type Msg = { role: 'user' | 'assistant' | 'system'; content: string }
+type Msg = { role: 'user' | 'assistant' | 'system'; content: string; file?: string }
 
 // Your form fields: keep this small for V1
 type FormData = { car: string; part: string; damage: string }
@@ -188,22 +189,26 @@ Damage: ${data.damage}.
 
 Please ask any follow-up questions and give a ballpark cost range with parts/labor separated for a mechanic shop in Brooklyn, NY in 2025 market rates.`
 
-  // Call your Next.js API route that wraps the OpenAI Chat API.
-  // Expects { messages } -> returns { reply }
-  const callChatAPI = async (msgs: Msg[]) => {
-    const res = await fetch('/controllers/chat', {
+  // Call the analyze quote endpoint. Expects { userText } -> returns { success, parsed }.
+  const callAnalyzeAPI = async (userText: string) => {
+    const res = await fetch('/api/analyzeQuote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: msgs }),
+      body: JSON.stringify({ userText }),
     })
 
     if (!res.ok) {
       const text = await res.text()
-      throw new Error(text || 'Chat API request failed')
+      throw new Error(text || 'Analyze quote request failed')
     }
 
     const data = await res.json()
-    return data.reply as string
+    if (!data || data.success === false) {
+      throw new Error(data?.error || 'Analyze quote failed')
+    }
+
+    const payload = data.parsed ?? data
+    return `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``
   }
 
   // Form submit → kick off chat with a composed first user message
@@ -219,11 +224,12 @@ Please ask any follow-up questions and give a ballpark cost range with parts/lab
 
     setIsSubmitting(true)
 
-    const firstUser: Msg = { role: 'user', content: composeFirstMessage(formData) }
+    const userText = composeFirstMessage(formData)
+    const firstUser: Msg = { role: 'user', content: userText }
     const newMsgs = [firstUser]
 
     try {
-      const reply = await callChatAPI(newMsgs)
+      const reply = await callAnalyzeAPI(userText)
       setMessages([...newMsgs, { role: 'assistant', content: reply }])
       setIsChatting(true) // swap to chat view
     } catch (err: any) {
@@ -238,13 +244,14 @@ Please ask any follow-up questions and give a ballpark cost range with parts/lab
     if (!input.trim()) return
     setError(null)
 
-    const userMsg: Msg = { role: 'user', content: input.trim() }
+    const userText = input.trim()
+    const userMsg: Msg = { role: 'user', content: userText }
     const pending = [...messages, userMsg]
     setMessages(pending)
     setInput('')
 
     try {
-      const reply = await callChatAPI(pending)
+      const reply = await callAnalyzeAPI(userText)
       setMessages([...pending, { role: 'assistant', content: reply }])
     } catch (err: any) {
       setError(err?.message || 'Failed to send message.')
@@ -355,16 +362,8 @@ Please ask any follow-up questions and give a ballpark cost range with parts/lab
             {/* Messages scroll area */}
             <div className="h-96 overflow-y-auto rounded-xl border border-gray-200 p-4 bg-gray-50">
               {messages.map((m, i) => (
-                <div key={i} className={`mb-3 flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm whitespace-pre-wrap ${
-                      m.role === 'user'
-                        ? 'bg-emerald-600 text-white rounded-br-sm'
-                        : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
-                    }`}
-                  >
-                    {m.content}
-                  </div>
+                <div key={i} className="mb-3">
+                  <ChatMessage message={m} />
                 </div>
               ))}
               {error && (

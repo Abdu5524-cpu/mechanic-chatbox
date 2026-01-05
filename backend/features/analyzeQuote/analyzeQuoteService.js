@@ -4,9 +4,9 @@ import { quoteParser } from "./quoteParser.js";
 export async function analyzeQuoteService(input) {
 
     // extract input
-    const { userText, userLocationHint = null } = input;
+    const { userText } = input;
 
-    const parsed = await quoteParser({ userText, userLocationHint});
+    const parsed = await quoteParser({ userText });
     
     if (parsed === null || parsed === undefined) {
         return {

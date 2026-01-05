@@ -5,7 +5,7 @@ import { analyzeQuoteService } from "./analyzeQuoteService.js";
 async function analyzeQuoteController(req, res, next) {
   try {
     // extract input
-    const { userText, userLocationHint } = req.body;
+    const { userText } = req.body;
 
   //validation
     if (!userText || typeof userText !== "string") {
@@ -15,10 +15,10 @@ async function analyzeQuoteController(req, res, next) {
   });
 }
   //call service
-    const result = await analyzeQuoteService({ userText, userLocationHint });
+    const result = await analyzeQuoteService({ userText });
 
     if (!result || !result.success) {
-      return res.status(599).json({
+      return res.status(502).json({
         success: false,
         error: "service failed to analyze quote"
       });

@@ -12,9 +12,18 @@ export function extractOutput(response) {
     return firstContent.text;
   }
   if (firstContent?.type === "json_object" && firstContent.json_object) {
-    return JSON.stringify(firstContent.json_object);
+    return firstContent.json_object;
   }
-  return response?.output_text ?? null;
+  if (firstContent) {
+    return firstContent;
+  }
+  if (response?.output_text !== undefined) {
+    return response.output_text;
+  }
+  if (response?.output) {
+    return response.output;
+  }
+  return response ?? null;
 }
 
 // Send a prompt to the model and return a string best-effort from any response type.
@@ -25,8 +34,9 @@ export async function callWrapper(systemContent, userContent, responseFormat) {
         {role: "system", content: systemContent},
         {role: "user", content: userContent},
   ],
-    response_format: {responseFormat },
-  });
+    text: {
+    format: { responseFormat },
+  }});
 
   return extractOutput(response);
 }
