@@ -1,5 +1,6 @@
 import { callWrapper } from "../../lib/callWrapper.js";
 
+// Extract a location hint from free text and return both the cleaned text and hint.
 function extractLocationHint(rawText) {
     const labeled = rawText.match(/(?:location hint|location|located in)\s*:\s*([^\n]+)/i);
     if (labeled) {
@@ -26,6 +27,7 @@ function extractLocationHint(rawText) {
     return { cleanedText: rawText, userLocationHint: null };
 }
 
+// Build the schema prompt and run the model to parse userText into JSON.
 export async function quoteParser({ userText }) {
 
     const systemContent = `
@@ -43,6 +45,7 @@ export async function quoteParser({ userText }) {
 
 
 
+    // JSON schema the model must conform to.
     const responseFormat = {
         type: "json_schema",
         json_schema: {
@@ -208,10 +211,12 @@ export async function quoteParser({ userText }) {
 
 
 
+    // Normalize userText and append any detected location hint.
     const { cleanedText, userLocationHint } = extractLocationHint(userText);
     const inputText = cleanedText + (userLocationHint ? `\n\nUser location hint: ${userLocationHint}` : "");
     
     try {
+        // callWrapper sends the prompt to OpenAI and returns the parsed content.
         const parsed = await callWrapper(
             systemContent,
             inputText,

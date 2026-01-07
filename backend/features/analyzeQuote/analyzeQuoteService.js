@@ -3,11 +3,12 @@ import { quoteParser } from "./quoteParser.js";
 
 export async function analyzeQuoteService(input) {
 
-    // extract input
+    // Extract the raw userText and hand it to the parser.
     const { userText } = input;
 
     const parsed = await quoteParser({ userText });
     
+    // If parsing fails, surface an error object to the controller.
     if (parsed === null || parsed === undefined) {
         return {
             success: false,

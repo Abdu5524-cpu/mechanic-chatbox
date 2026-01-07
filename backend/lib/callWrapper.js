@@ -3,6 +3,7 @@ import OpenAI from "openai";
 // Initialize the OpenAI client with the API key from the environment.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Normalize the Responses API output into a usable value for callers.
 export function extractOutput(response) {
   const firstContent = response?.output?.[0]?.content?.[0];
   if (firstContent?.type === "output_text" && firstContent.text?.value) {
@@ -26,7 +27,7 @@ export function extractOutput(response) {
   return response ?? null;
 }
 
-// Send a prompt to the model and return a string best-effort from any response type.
+// Send a prompt to the model with an optional response schema/format.
 export async function callWrapper(systemContent, userContent, responseFormat) {
   const response = await openai.responses.create({
     model: "gpt-4.1-nano",

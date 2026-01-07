@@ -7,14 +7,14 @@ async function analyzeQuoteController(req, res, next) {
     // extract input
     const { userText } = req.body;
 
-  //validation
+  // Validate the incoming request body.
     if (!userText || typeof userText !== "string") {
   return res.status(400).json({
     success: false,
     error: "userText is required and must be a string"
   });
 }
-  //call service
+  // Call the analyze-quote service and return its result.
     const result = await analyzeQuoteService({ userText });
 
     if (!result || !result.success) {

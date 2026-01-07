@@ -1,7 +1,6 @@
 
 'use client'
 import { useEffect } from 'react'
-import { useState } from 'react'
 import About from '../components/About'
 import QuoteForm from '../components/QuoteForm'
 
@@ -12,7 +11,12 @@ export default function Home() {
   useEffect(() => {
     console.log("Component mounted"); // Step 6 log
 
-    fetch('http://localhost:3000/api/ping')
+    // Dev-only smoke test: posts userText to the backend analyze endpoint.
+    fetch('http://localhost:3001/api/analyzeQuote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userText })
+    })
 
       .then(res => res.json())
       .then(data => {console.log('API response:', data); //step 6 log
@@ -23,8 +27,6 @@ export default function Home() {
   }, []);
 
 
-  const [formData, setFormData] = useState({ name: '', car: '', issue: '' })
-
   return (
     <main className="flex flex-col gap-20 px-4 py-10 max-w-4xl mx-auto text-gray-800">
       {/* Hero */}
@@ -33,18 +35,16 @@ export default function Home() {
         <p className="text-lg">Auto repair shop providing services such as oil changes and tire repairs, plus bodywork.</p>
       </section>
 
-      {/* Services */}
+      {/* Analyze Quote Summary */}
       <section>
-        <h2 className="text-2xl font-semibold mb-4">Our Services</h2>
-        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <li className="bg-gray-100 p-4 rounded-xl shadow">Oil Changes</li>
-          <li className="bg-gray-100 p-4 rounded-xl shadow">Brake Repair</li>
-          <li className="bg-gray-100 p-4 rounded-xl shadow">Engine Diagnostics</li>
-          <li className="bg-gray-100 p-4 rounded-xl shadow">Body Work</li>
-        </ul>
+        <h2 className="text-2xl font-semibold mb-4">Analyze Your Quote</h2>
+        <p className="text-gray-700">
+          Drop in a repair quote or describe the vehicle, damage, and location.
+          We will return a structured summary so you can understand the scope and total at a glance.
+        </p>
       </section>
 
-      {/* Quote Form */}
+      {/* Quote analysis chat UI */}
       <QuoteForm />
 
       {/* About Section */}
@@ -63,5 +63,3 @@ export default function Home() {
   
   
 }
-
-

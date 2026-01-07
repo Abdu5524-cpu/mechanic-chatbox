@@ -124,6 +124,10 @@ export default function QuoteForm() {
                         </button>
                     </div>
                 </form>
+
+                {response && (
+                    <p className="mt-4 text-sm text-gray-700">{response}</p>
+                )}
             </div>
         </section>
 
@@ -132,4 +136,3 @@ export default function QuoteForm() {
 )
     
 }
-

@@ -14,7 +14,7 @@ console.log("__dirname:", __dirname);
 
 
 
-// Initialize Express app
+// Initialize Express app and middleware stack.
 const app = express();
 
 
@@ -43,6 +43,7 @@ app.use(express.json());
 
 
 
+// API routes live under /api.
 app.use("/api", intentrouter);
 // Backwards-compat for older frontend fetch paths.
 app.use("/controllers", intentrouter);
@@ -62,5 +63,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(process.env.BACKEND_PORT || 3000, () =>
-  console.log(`Server running on port ${process.env.BACKEND_PORT || 3002}`)
+  console.log(`Server running on port ${process.env.BACKEND_PORT || 3000}`)
 );
