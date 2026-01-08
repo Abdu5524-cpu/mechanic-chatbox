@@ -12,14 +12,15 @@ export async function analyzeQuoteService(input) {
     if (parsed === null || parsed === undefined) {
         return {
             success: false,
+            stage: "quoteParser",
             error: "parser failed to extract quote information"
         };
-    } else {
-        return {
+    }
+
+    return {
         success: true,
         parsed
-        };
-    }
+    };
 }
 
 /**

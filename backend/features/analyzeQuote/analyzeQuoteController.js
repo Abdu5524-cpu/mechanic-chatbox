@@ -7,7 +7,8 @@ async function analyzeQuoteController(req, res, next) {
     // extract input
     const { userText } = req.body;
 
-  // Validate the incoming request body.
+    // Validate the incoming request body.
+    console.log("analyzeQuote request body:", req.body);
     if (!userText || typeof userText !== "string") {
   return res.status(400).json({
     success: false,
@@ -18,8 +19,9 @@ async function analyzeQuoteController(req, res, next) {
     const result = await analyzeQuoteService({ userText });
 
     if (!result || !result.success) {
-      return res.status(502).json({
+      return res.status(502).json(result || {
         success: false,
+        stage: "analyzeQuoteService",
         error: "service failed to analyze quote"
       });
     }

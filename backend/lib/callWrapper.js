@@ -32,12 +32,11 @@ export async function callWrapper(systemContent, userContent, responseFormat) {
   const response = await openai.responses.create({
     model: "gpt-4.1-nano",
     input: [
-        {role: "system", content: systemContent},
-        {role: "user", content: userContent},
-  ],
-    text: {
-    format: { responseFormat },
-  }});
+      { role: "system", content: systemContent },
+      { role: "user", content: userContent },
+    ],
+    text: { format: responseFormat },
+  });
 
   return extractOutput(response);
 }

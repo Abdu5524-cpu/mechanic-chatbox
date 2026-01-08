@@ -6,6 +6,24 @@ import ChatMessage from './ChatMessage'
 
 type Msg = { role: 'user' | 'assistant' | 'system'; content: string; file?: string }
 
+type ParsedQuote = {
+  parsedQuote?: {
+    originalText?: string
+    vehicle?: { make?: string | null; model?: string | null; year?: string | null }
+    damages?: string[]
+    location?: { city?: string | null; stateOrRegion?: string | null; userLocationHint?: string | null }
+    services?: string[]
+    quoteTotal?: number | null
+    quoteRangeMin?: number | null
+    quoteRangeMax?: number | null
+    shopName?: string | null
+    notesFromUser?: string | null
+  }
+  riskLevel?: string
+  reasons?: string[]
+  recommendations?: string[]
+}
+
 export default function QuoteForm() {
   // Chat state: running transcript exchanged with the model
   const [messages, setMessages] = useState<Msg[]>([])
@@ -16,14 +34,52 @@ export default function QuoteForm() {
 
   // Ref to auto-scroll to the bottom when messages change
   const endRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // Keep the chat scrolled to the latest message
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!scrollRef.current) return
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
   // Call the analyze-quote endpoint with a single `userText` payload.
   // The backend responds with a parsed schema object (or an error).
+  const formatParsedQuote = (payload: ParsedQuote) => {
+    const q = payload.parsedQuote
+    const vehicle = q?.vehicle
+    const location = q?.location
+    const vehicleLine = [vehicle?.year, vehicle?.make, vehicle?.model].filter(Boolean).join(' ')
+    const locationLine = [location?.city, location?.stateOrRegion].filter(Boolean).join(', ')
+    const damages = q?.damages?.length ? q.damages.join(', ') : 'Not specified'
+    const services = q?.services?.length ? q.services.join(', ') : 'Not specified'
+    const reasons = payload.reasons?.length ? payload.reasons.join(' ') : 'Not specified'
+    const recommendations = payload.recommendations?.length ? payload.recommendations.join(' ') : 'Not specified'
+    const quoteTotal = q?.quoteTotal !== null && q?.quoteTotal !== undefined ? `$${q.quoteTotal}` : 'Not specified'
+    const rangeMin = q?.quoteRangeMin
+    const rangeMax = q?.quoteRangeMax
+    const quoteRange = rangeMin !== null && rangeMin !== undefined && rangeMax !== null && rangeMax !== undefined
+      ? `$${rangeMin} - $${rangeMax}`
+      : 'Not specified'
+
+    return [
+      `Summary`,
+      ``,
+      `Vehicle: ${vehicleLine || 'Not specified'}`,
+      `Damage: ${damages}`,
+      `Services: ${services}`,
+      ``,
+      `Location: ${locationLine || 'Not specified'}`,
+      `Quote Total: ${quoteTotal}`,
+      ``,
+      `Typical Range: ${quoteRange}`,
+      ``,
+      `Risk Level: ${payload.riskLevel || 'Not specified'}`,
+      `Reasons: ${reasons}`,
+      ``,
+      `Recommendations: ${recommendations}`,
+    ].join('\n')
+  }
+
   const callAnalyzeAPI = async (userText: string) => {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || ''
     const res = await fetch(`${apiBase}/api/analyzeQuote`, {
@@ -43,7 +99,10 @@ export default function QuoteForm() {
     }
 
     const payload = data.parsed ?? data // normalize to a single object shape for display
-    return payload
+    if (payload && typeof payload === 'object') {
+      return formatParsedQuote(payload as ParsedQuote)
+    }
+    return String(payload)
 
   }
 
@@ -80,7 +139,7 @@ export default function QuoteForm() {
   // ------------------------------
   return (
     <section className="px-4 py-10 bg-gray-50">
-      <div className="max-w-[40rem] mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+      <div className="max-w-[52rem] mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
         <header className="mb-4">
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Analyze Your Quote</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -89,7 +148,10 @@ export default function QuoteForm() {
         </header>
 
         {/* Messages scroll area */}
-        <div className="h-96 overflow-y-auto rounded-xl border border-gray-200 p-4 bg-gray-50">
+        <div
+          ref={scrollRef}
+          className="h-[32rem] overflow-y-auto rounded-xl border border-gray-200 p-4 bg-gray-50"
+        >
           {messages.map((m, i) => (
             <div key={i} className="mb-3">
               <ChatMessage message={m} />

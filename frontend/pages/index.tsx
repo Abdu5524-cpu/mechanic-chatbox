@@ -1,6 +1,5 @@
 
 'use client'
-import { useEffect } from 'react'
 import About from '../components/About'
 import QuoteForm from '../components/QuoteForm'
 
@@ -8,25 +7,6 @@ import QuoteForm from '../components/QuoteForm'
 
 
 export default function Home() {
-  useEffect(() => {
-    console.log("Component mounted"); // Step 6 log
-
-    // Dev-only smoke test: posts userText to the backend analyze endpoint.
-    fetch('http://localhost:3001/api/analyzeQuote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userText })
-    })
-
-      .then(res => res.json())
-      .then(data => {console.log('API response:', data); //step 6 log
-      }) // Step 6 log
-      .catch(err => {
-        console.error('Error fetching API:', err); // Step 7 log
-    });
-  }, []);
-
-
   return (
     <main className="flex flex-col gap-20 px-4 py-10 max-w-4xl mx-auto text-gray-800">
       {/* Hero */}

@@ -37,6 +37,7 @@ export async function quoteParser({ userText }) {
     - Ensure every field or value required by the schema is populated using information from the user input whenever possible. If required information is missing, infer values logically if feasible, otherwise use null or an empty string as appropriate.
     - Only output the resulting JSON; do not include explanations, apologies, or additional text.
     - Persist in mapping all relevant information until the entire schema is filled to the best extent possible before producing your response.
+    - Estimate a typical quote range (min/max) for the requested services using common market rates when exact pricing is missing.
 
     Output rules:
     - The response should be a single, valid JSON object that fully matches the provided schema.
@@ -45,13 +46,12 @@ export async function quoteParser({ userText }) {
 
 
 
-    // JSON schema the model must conform to.
+    // JSON schema the model must conform to for Responses API text.format.
     const responseFormat = {
         type: "json_schema",
-        json_schema: {
-            "name": "parsed_quote_analysis",
-            "strict": true,
-            "schema": {
+        name: "parsed_quote_analysis",
+        strict: true,
+        schema: {
                 "type": "object",
                 "properties": {
                 "parsedQuote": {
@@ -146,6 +146,20 @@ export async function quoteParser({ userText }) {
                         ],
                         "description": "The total amount of the quote, or null if not available."
                     },
+                    "quoteRangeMin": {
+                        "type": [
+                        "number",
+                        "null"
+                        ],
+                        "description": "Estimated low-end typical price for the described services, or null if unknown."
+                    },
+                    "quoteRangeMax": {
+                        "type": [
+                        "number",
+                        "null"
+                        ],
+                        "description": "Estimated high-end typical price for the described services, or null if unknown."
+                    },
                     "shopName": {
                         "type": [
                         "string",
@@ -168,6 +182,8 @@ export async function quoteParser({ userText }) {
                     "location",
                     "services",
                     "quoteTotal",
+                    "quoteRangeMin",
+                    "quoteRangeMax",
                     "shopName",
                     "notesFromUser"
                     ],
@@ -205,7 +221,6 @@ export async function quoteParser({ userText }) {
                 ],
                 "additionalProperties": false
             }
-        }
     };
 
 
@@ -223,10 +238,21 @@ export async function quoteParser({ userText }) {
             responseFormat
         );
 
-        if (!parsed || typeof parsed !== "json_object") return null;
-        return parsed;
+        console.log("quoteParser parsed output:", parsed);
+        let parsedValue = parsed;
+        if (typeof parsedValue === "string") {
+            try {
+                parsedValue = JSON.parse(parsedValue);
+            } catch (parseErr) {
+                console.error("quoteParser JSON.parse failed:", parseErr);
+                return null;
+            }
+        }
+        if (!parsedValue || typeof parsedValue !== "object") return null;
+        return parsedValue;
     } catch (err) {
-        return {error: err.message};
+        console.error("quoteParser error:", err);
+        return { error: err.message || "Unknown error" };
     }
 
 }
