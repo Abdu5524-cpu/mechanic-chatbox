@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import ChatMessage from './ChatMessage'
 
@@ -14,6 +14,7 @@ type ParsedQuote = {
     location?: { city?: string | null; stateOrRegion?: string | null; userLocationHint?: string | null }
     services?: string[]
     quoteTotal?: number | null
+    currency?: string
     quoteRangeMin?: number | null
     quoteRangeMax?: number | null
     shopName?: string | null
@@ -32,15 +33,9 @@ export default function QuoteForm() {
   // Error banner content (form + chat)
   const [error, setError] = useState<string | null>(null)
 
-  // Ref to auto-scroll to the bottom when messages change
+  // Refs for the scrollable chat container
   const endRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-
-  // Keep the chat scrolled to the latest message
-  useEffect(() => {
-    if (!scrollRef.current) return
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages])
 
   // Call the analyze-quote endpoint with a single `userText` payload.
   // The backend responds with a parsed schema object (or an error).
@@ -139,7 +134,7 @@ export default function QuoteForm() {
   // ------------------------------
   return (
     <section className="px-4 py-10 bg-gray-50">
-      <div className="max-w-[52rem] mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+      <div className="max-w-[52rem] mx-auto bg-white/70 backdrop-blur p-6 sm:p-8 rounded-2xl shadow-lg">
         <header className="mb-4">
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Analyze Your Quote</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -150,7 +145,7 @@ export default function QuoteForm() {
         {/* Messages scroll area */}
         <div
           ref={scrollRef}
-          className="h-[32rem] overflow-y-auto rounded-xl border border-gray-200 p-4 bg-gray-50"
+          className="h-[32rem] overflow-y-auto rounded-xl border border-gray-200 p-6 bg-white/70"
         >
           {messages.map((m, i) => (
             <div key={i} className="mb-3">
@@ -171,7 +166,7 @@ export default function QuoteForm() {
             onKeyDown={handleKeyDown}
             placeholder="e.g. 2018 Toyota Camry, rear bumper dent, Austin TX. Quote total $1,250."
             rows={2}
-            className="flex-1 resize-none rounded-xl border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="flex-1 resize-none rounded-xl border border-gray-300 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
           />
           <Button
             type="button"

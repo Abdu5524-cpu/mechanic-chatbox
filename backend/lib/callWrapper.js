@@ -28,7 +28,10 @@ export function extractOutput(response) {
 }
 
 // Send a prompt to the model with an optional response schema/format.
-export async function callWrapper(systemContent, userContent, responseFormat) {
+export async function callWrapper(systemContent, userContent, responseFormat, options = {}) {
+  const { enableWebSearch = false } = options;
+  const tools = enableWebSearch ? [{ type: "web_search_preview" }] : undefined;
+
   const response = await openai.responses.create({
     model: "gpt-4.1-nano",
     input: [
@@ -36,6 +39,7 @@ export async function callWrapper(systemContent, userContent, responseFormat) {
       { role: "user", content: userContent },
     ],
     text: { format: responseFormat },
+    ...(tools ? { tools } : {}),
   });
 
   return extractOutput(response);
