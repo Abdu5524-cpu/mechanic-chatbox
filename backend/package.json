@@ -14,10 +14,10 @@
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
     "morgan": "^1.10.1",
-    "openai": "^5.23.2",
-    "pg": "^8.16.2"
+    "openai": "^5.23.2"
   }
 }

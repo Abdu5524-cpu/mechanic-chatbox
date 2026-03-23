@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 
-// Initialize the OpenAI client with the API key from the environment.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Normalize the Responses API output into a usable value for callers.
@@ -28,21 +27,29 @@ export function extractOutput(response) {
 }
 
 // Send a prompt to the model with an optional response schema/format.
+// Enforces a 30-second hard timeout to prevent hanging requests.
 export async function callWrapper(systemContent, userContent, responseFormat, options = {}) {
   const { enableWebSearch = false } = options;
   const tools = enableWebSearch ? [{ type: "web_search_preview" }] : undefined;
 
-  const response = await openai.responses.create({
-    model: "gpt-4.1-nano",
-    input: [
-      { role: "system", content: systemContent },
-      { role: "user", content: userContent },
-    ],
-    text: { format: responseFormat },
-    ...(tools ? { tools } : {}),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
 
-  return extractOutput(response);
+  try {
+    const response = await openai.responses.create({
+      model: "gpt-4.1",
+      input: [
+        { role: "system", content: systemContent },
+        { role: "user", content: userContent },
+      ],
+      text: { format: responseFormat },
+      ...(tools ? { tools } : {}),
+    }, { signal: controller.signal });
+
+    return extractOutput(response);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export default callWrapper;

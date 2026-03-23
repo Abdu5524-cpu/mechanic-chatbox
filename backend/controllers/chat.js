@@ -3,9 +3,7 @@ import OpenAI from "openai";
 
 const router = Router();
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY ?? process.env.OpenAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 router.post("/", async (req, res, next) => {
   try {
@@ -23,7 +21,7 @@ router.post("/", async (req, res, next) => {
         ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-nano",
+      model: "gpt-4o",
       messages: resolvedMessages,
     });
 

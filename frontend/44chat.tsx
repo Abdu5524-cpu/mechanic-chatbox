@@ -127,7 +127,7 @@ const THEMES: Theme[] = [
 const initialMessages: Message[] = [
   {
     id: 1,
-    content: 'Paste a repair quote or describe the vehicle, damage, and location.',
+    content: 'Paste a repair quote or describe the vehicle, damage, quote, and location.',
     isUser: false,
     time: 'Now',
   },

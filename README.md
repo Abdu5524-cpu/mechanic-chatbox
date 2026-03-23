@@ -1,127 +1,229 @@
 # Mechanic Chatbox
 
-Mechanic Chatbox is a full-stack app that helps users paste or describe an auto repair quote and receive a structured analysis. The frontend is a Next.js UI with a chat-like experience, and the backend is an Express API that calls OpenAI for parsing and analysis.
+**AI-powered auto repair quote analyzer.** Paste or describe a mechanic's estimate — vehicle, damage, location, price — and get back a structured breakdown: parsed quote data, a typical price range for that repair, a risk assessment (LOW / MEDIUM / HIGH), and actionable recommendations.
 
-Live app: https://mechanic-frontend.onrender.com
+**Live:** https://mechanic-frontend.onrender.com
 
-## Features
-- Quote analysis endpoint that converts free text into a structured summary.
-- Chat-style UI with multiple themes and formatted results.
-- Optional database schema placeholder for future user accounts.
+---
 
-## Project Structure
-- `backend/` Express API, OpenAI integration, quote parsing and analysis.
-- `frontend/` Next.js app (pages router) with the chat UI.
-- `database/` SQL schema for a basic `users` table (not wired in yet).
+## What It Does
 
-## Requirements
-- Node.js 18+ (recommended)
-- npm (or your preferred Node package manager)
-- OpenAI API key
-- (Optional) Postgres if you plan to use the schema in `database/schema.sql`
+Most people have no reference point when they receive a repair quote. This tool closes that gap:
 
-## Setup
+1. You describe the job in plain language or paste a quote verbatim
+2. The backend parses it into structured data using GPT-4.1 via the OpenAI Responses API
+3. It estimates what that repair typically costs in your region using a second pass with live web search
+4. It assesses the risk level of the quote and returns specific reasons and recommendations
 
-### 1) Install dependencies
-```bash
-cd backend
-npm install
+---
 
-cd ../frontend
-npm install
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15, React 18, Tailwind CSS v4, Framer Motion |
+| Backend | Node.js, Express 4, OpenAI SDK v5 |
+| AI | GPT-4.1 (Responses API) for structured parsing, GPT-4o (Chat Completions) for conversation |
+| Hosting | Render (backend Web Service + frontend Static Site) |
+
+---
+
+## Architecture
+
+```
+frontend/          Next.js app — chat UI, theme switcher, quote formatting
+backend/
+  app.js           Express server — helmet, CORS, rate limiting, startup validation
+  intentrouter.js  Route definitions
+  controllers/     chat.js — GPT-4o chat completions endpoint
+  features/
+    analyzeQuote/  Controller → Service → Parser pipeline
+  lib/
+    callWrapper.js OpenAI Responses API wrapper with 30s timeout
 ```
 
-### 2) Backend environment variables
-Create a `backend/.env` file:
+**Request pipeline for `/api/analyzeQuote`:**
+```
+User input
+  → Input guardrails (length cap, sanitization)
+  → quoteParser → GPT-4.1 structured JSON output
+  → estimateQuoteRange → GPT-4.1 with web search (if range not returned)
+  → Formatted response to frontend
+```
+
+---
+
+## Security
+
+- **CORS** fails closed — no allowed origins configured means all cross-origin requests are denied
+- **Rate limiting** — 20 requests per 15 minutes per IP
+- **Input guardrails** — 4,000 char max, 10 char min, control character stripping
+- **Startup validation** — server refuses to start if required env vars are absent
+- **Security headers** — `helmet` sets CSP, HSTS, X-Frame-Options, and more
+- **Request size limit** — `express.json({ limit: "10kb" })`
+- **30-second timeout** on all OpenAI calls via `AbortController`
+
+---
+
+## Local Development
+
+### Prerequisites
+- Node.js 18+
+- An OpenAI API key with access to GPT-4.1 and GPT-4o
+
+### 1. Clone and install
+
 ```bash
-OPENAI_API_KEY=your_openai_api_key
-BACKEND_PORT=3000
+git clone https://github.com/your-username/resume-project.git
+cd resume-project
+
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### 2. Configure the backend
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Edit `backend/.env`:
+```
+OPENAI_API_KEY=sk-...
 ALLOWED_ORIGINS=http://localhost:3001
+PORT=3000
 ```
 
-Notes:
-- `OPENAI_API_KEY` is required. The API will fail without it.
-- `BACKEND_PORT` defaults to `3000` if not set.
-- `ALLOWED_ORIGINS` controls CORS. Use a comma-separated list if you have more than one origin.
+`OPENAI_API_KEY` and `ALLOWED_ORIGINS` are required — the server will not start without them. `PORT=3000` keeps the backend off the same port as the frontend (`3001`). On Render, `PORT` is injected automatically and overrides this.
 
-### 3) Frontend environment variables
-Create a `frontend/.env.local` file:
+### 3. Configure the frontend
+
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+cp frontend/.env.example frontend/.env
 ```
 
-Notes:
-- The frontend uses `NEXT_PUBLIC_API_BASE_URL` to call the backend. If unset, it defaults to a relative URL.
-- The default frontend dev port is `3001`, so the backend should allow `http://localhost:3001`.
+`frontend/.env` already contains `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000` which points to the backend.
 
-## Running the Project (Development)
+### 4. Run
 
-### Start the backend
 ```bash
-cd backend
-npm start
+# Terminal 1 — backend
+cd backend && npm start
+
+# Terminal 2 — frontend
+cd frontend && npm run dev
 ```
-This starts the API on `http://localhost:3000` by default.
 
-### Start the frontend
-```bash
-cd frontend
-npm run dev
-```
-This starts the Next.js app on `http://localhost:3001`.
+Open **http://localhost:3001**
 
-### View the app
-Open `http://localhost:3001` in your browser.
+---
 
-## API Endpoints
+## API Reference
 
 ### `POST /api/analyzeQuote`
-Parses a user-provided quote or repair description into structured data and returns a summary.
 
-Request body:
+Parses a free-text repair description into structured data and returns a risk analysis.
+
+**Request**
 ```json
-{ "userText": "2018 Toyota Camry, rear bumper dent, Austin TX. Quote total $1,250." }
+{ "userText": "2019 Honda Civic, front bumper crack and paint, San Diego CA. Shop quoted $1,800." }
 ```
 
-Response (example shape):
+**Constraints:** `userText` must be a non-empty string between 10 and 4,000 characters.
+
+**Response**
 ```json
 {
   "success": true,
   "parsed": {
-    "parsedQuote": { "...": "..." },
+    "parsedQuote": {
+      "vehicle": { "make": "Honda", "model": "Civic", "year": "2019" },
+      "damages": ["front bumper crack", "paint damage"],
+      "location": { "city": "San Diego", "stateOrRegion": "CA" },
+      "services": ["bumper replacement", "paint repair"],
+      "quoteTotal": 1800,
+      "quoteRangeMin": 900,
+      "quoteRangeMax": 1600,
+      "currency": "USD",
+      "shopName": null
+    },
     "riskLevel": "MEDIUM",
-    "reasons": ["..."],
-    "recommendations": ["..."]
+    "reasons": ["Quote is above typical range for this repair in this region."],
+    "recommendations": ["Get a second quote from another shop.", "Ask for a line-item breakdown."]
   }
 }
 ```
 
-### `POST /api/chat`
-Simple chat endpoint backed by OpenAI chat completions. Accepts either `messages` or a `formData` payload.
+**Error responses**
 
-Request body (example):
+| Status | Meaning |
+|--------|---------|
+| 400 | `userText` missing, too short, or too long |
+| 429 | Rate limit exceeded |
+| 502 | Upstream parsing failed |
+| 500 | Unexpected server error |
+
+---
+
+### `POST /api/chat`
+
+General-purpose chat endpoint backed by GPT-4o. Accepts a message history or a raw form payload.
+
+**Request**
 ```json
-{ "messages": [{ "role": "user", "content": "Hello" }] }
+{ "messages": [{ "role": "user", "content": "What's a fair price for a rear bumper respray?" }] }
 ```
 
-## Database
-`database/schema.sql` contains a basic `users` table definition. It is not connected to the backend yet. If you plan to add auth or persistence, you can start here.
+**Response**
+```json
+{ "reply": "A rear bumper respray typically ranges from..." }
+```
 
-## Scripts
+---
 
-Backend (`backend/package.json`)
-- `npm start` - start the Express server
+### `GET /health`
 
-Frontend (`frontend/package.json`)
-- `npm run dev` - start Next.js dev server on port 3001
-- `npm run build` - production build
-- `npm start` - run the production build
-- `npm run lint` - run ESLint
+Returns `{ "status": "ok" }`. Used by Render's health check system.
+
+---
+
+## Deployment (Render)
+
+**Backend — Web Service**
+
+| Setting | Value |
+|---------|-------|
+| Build command | `npm install` |
+| Start command | `node app.js` |
+| Health check path | `/health` |
+| `OPENAI_API_KEY` | Your OpenAI key |
+| `ALLOWED_ORIGINS` | Your frontend Render URL |
+
+**Frontend — Static Site**
+
+| Setting | Value |
+|---------|-------|
+| Build command | `npm run build` |
+| `NEXT_PUBLIC_API_BASE_URL` | Your backend Render URL |
+
+---
 
 ## Troubleshooting
-- If you see CORS errors, ensure `ALLOWED_ORIGINS` includes your frontend URL.
-- If the API responds with 500 errors, confirm `OPENAI_API_KEY` is set and valid.
-- If the frontend fails to call the backend, ensure `NEXT_PUBLIC_API_BASE_URL` points to the correct backend URL.
+
+**CORS errors in the browser**
+Confirm `ALLOWED_ORIGINS` on the backend includes the exact frontend origin (protocol + domain, no trailing slash).
+
+**Backend won't start**
+The server validates `OPENAI_API_KEY` and `ALLOWED_ORIGINS` at boot. Check the startup log — it will print the exact missing variable.
+
+**429 Too Many Requests**
+You've hit the rate limit (20 requests / 15 minutes). Wait and try again.
+
+**Slow responses**
+The quote analysis pipeline makes two sequential LLM calls. Response time is typically 5–15 seconds depending on OpenAI load.
+
+---
 
 ## License
-See `LICENSE`.
+
+See [LICENSE](LICENSE).

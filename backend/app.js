@@ -1,28 +1,30 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import morgan from "morgan";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import intentrouter from "./intentrouter.js";
 
-console.log("CWD:", process.cwd());
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-console.log("__dirname:", __dirname);
+// Fail fast: refuse to start if any required env var is missing.
+const REQUIRED_ENV = ["OPENAI_API_KEY", "ALLOWED_ORIGINS"];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`[startup] Missing required env var: ${key}`);
+    process.exit(1);
+  }
+}
 
+const PORT = process.env.PORT || 3000;
 
-
-
-// Initialize Express app and middleware stack.
 const app = express();
 
+// Security headers.
+app.use(helmet());
 
-
-// CORS configuration
-// Allow requests from specific origins
+// CORS — fail closed: if origin is not in the allow-list, deny.
 const allowed = new Set(
-  (process.env.ALLOWED_ORIGINS || "")
+  process.env.ALLOWED_ORIGINS
     .split(",")
     .map(s => s.trim())
     .filter(Boolean)
@@ -30,38 +32,42 @@ const allowed = new Set(
 
 const corsMiddleware = cors({
   origin(origin, cb) {
-    // allow non-browser/SSR/cURL (no Origin) and allow-all when list is empty
-    if (!origin || allowed.size === 0 || allowed.has(origin)) return cb(null, true);
+    if (!origin) return cb(null, true); // allow non-browser (SSR, curl, health checks)
+    if (allowed.has(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS"));
   },
   credentials: true,
 });
 
-app.use(morgan("dev"));
+// Rate limiting: 20 requests per 15 minutes per IP across all /api routes.
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please wait and try again." },
+});
+
+app.use(morgan("combined"));
 app.use(corsMiddleware);
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
+app.use("/api", limiter);
 
+// Health check — no auth, no rate limiting, used by Render and uptime monitors.
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
-
-// API routes live under /api.
+// API routes.
 app.use("/api", intentrouter);
-// Backwards-compat for older frontend fetch paths.
-app.use("/controllers", intentrouter);
-
-
-// Any cases that fall through
 
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found' });
+  res.status(404).json({ error: "Not Found" });
 });
 
-
-// Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Unhandled Error:', err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error("Unhandled Error:", err);
+  res.status(500).json({ error: "Internal Server Error" });
 });
 
-app.listen(process.env.BACKEND_PORT || 3000, () =>
-  console.log(`Server running on port ${process.env.BACKEND_PORT || 3000}`)
-);
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

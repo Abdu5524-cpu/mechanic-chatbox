@@ -372,8 +372,7 @@ export async function quoteParser({ userText }) {
             parsed = await callWrapper(
                 systemContent,
                 inputText,
-                responseFormat,
-                { enableWebSearch: true }
+                responseFormat
             );
         } catch (err) {
             const message = err?.message || "";
@@ -384,7 +383,6 @@ export async function quoteParser({ userText }) {
             }
         }
 
-        console.log("quoteParser parsed output:", parsed);
         let parsedValue = parsed;
         if (typeof parsedValue === "string") {
             try {
