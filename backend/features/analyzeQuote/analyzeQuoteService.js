@@ -6,8 +6,6 @@ const USER_FACING_ERROR = "We couldn't analyze that quote right now. Please try 
 export async function analyzeQuoteService({ userText }) {
   try {
     const parsed = await quoteParser({ userText });
-    // The legacy parser signals failure with { error }; removed in Task 5 once it throws instead.
-    if (!parsed || parsed.error) throw new Error(parsed?.error ?? "Parser returned nothing");
     return { success: true, parsed };
   } catch (err) {
     console.error("[analyzeQuote] analysis failed:", err);
