@@ -1,17 +1,19 @@
 {
-  "name": "backend",
+  "name": "quotecheck-backend",
   "version": "1.0.0",
+  "private": true,
+  "description": "Express API for QuoteCheck AI: analyzes auto repair quotes with Claude.",
   "type": "module",
   "main": "app.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
     "test": "vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "cors": "^2.8.5",
