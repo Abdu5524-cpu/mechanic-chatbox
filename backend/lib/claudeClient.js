@@ -22,14 +22,24 @@ export function findToolInput(response, toolName) {
 
 // Ask Claude to answer by calling `tool`, whose input_schema is the output shape we want.
 // Without web search the tool is forced. With web search the model may search first and then submit.
-export async function callStructured({ system, user, tool, webSearch = false, maxTokens = 4096 }) {
-  const response = await getClient().messages.create({
-    model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: user }],
-    tools: webSearch ? [WEB_SEARCH_TOOL, tool] : [tool],
-    tool_choice: webSearch ? { type: "auto" } : { type: "tool", name: tool.name },
-  });
-  return findToolInput(response, tool.name);
+// max_tokens covers thinking, search reasoning and the tool input; you only pay for tokens used.
+export async function callStructured({ system, user, tool, webSearch = false, maxTokens = 16_000 }) {
+  const response = await getClient().messages.create(
+    {
+      model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+      tools: webSearch ? [WEB_SEARCH_TOOL, tool] : [tool],
+      tool_choice: webSearch ? { type: "auto" } : { type: "tool", name: tool.name },
+    },
+    // The search pass is slow; the caller's forced no-search pass is its retry.
+    webSearch ? { maxRetries: 0 } : undefined
+  );
+
+  const input = findToolInput(response, tool.name);
+  if (!input) {
+    console.warn(`[claudeClient] ${tool.name} not called (stop_reason: ${response?.stop_reason})`, response?.usage);
+  }
+  return input;
 }

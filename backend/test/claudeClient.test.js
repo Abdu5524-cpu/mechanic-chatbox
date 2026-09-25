@@ -43,7 +43,7 @@ describe("callStructured", () => {
 
     const params = mockCreate.mock.calls[0][0];
     expect(params.model).toBe("claude-sonnet-5");
-    expect(params.max_tokens).toBe(4096);
+    expect(params.max_tokens).toBe(16000); // room for thinking + search reasoning + the tool input
     expect(params.system).toBe("sys");
     expect(params.messages).toEqual([{ role: "user", content: "hello" }]);
     expect(params.tools).toEqual([TOOL]);
@@ -58,6 +58,26 @@ describe("callStructured", () => {
     expect(params.tools[0]).toEqual({ type: "web_search_20250305", name: "web_search", max_uses: 3 });
     expect(params.tools[1]).toEqual(TOOL);
     expect(params.tool_choice).toEqual({ type: "auto" });
+  });
+
+  it("does not auto-retry the slow web-search pass (the forced fallback is the retry)", async () => {
+    mockCreate.mockResolvedValue(toolUse({}));
+    await callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true });
+    expect(mockCreate.mock.calls[0][1]).toEqual({ maxRetries: 0 });
+  });
+
+  it("keeps the client's default retry for the forced pass", async () => {
+    mockCreate.mockResolvedValue(toolUse({}));
+    await callStructured({ system: "s", user: "u", tool: TOOL });
+    expect(mockCreate.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("logs stop_reason and usage when the model does not call the tool", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockCreate.mockResolvedValue({ stop_reason: "max_tokens", usage: { output_tokens: 16000 }, content: [{ type: "text", text: "..." }] });
+    await callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("max_tokens"), expect.objectContaining({ output_tokens: 16000 }));
+    warn.mockRestore();
   });
 
   it("uses ANTHROPIC_MODEL when set", async () => {
