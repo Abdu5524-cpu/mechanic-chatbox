@@ -31,8 +31,8 @@ export async function quoteParser({ userText }) {
   return normalizeAnalysis(analysis, { quoteTotal, currency });
 }
 
-// Coerce model output into the exact shape the frontend expects. Totals and currency stated in
-// the text win over the model's reading.
+// Coerce model output into the exact shape the frontend expects. The model reads the whole quote,
+// so its total wins; the regex total is only a fallback. A currency symbol in the text wins.
 export function normalizeAnalysis(analysis, { quoteTotal, currency }) {
   const q = analysis.parsedQuote ?? {};
   const min = num(q.quoteRangeMin);
@@ -50,7 +50,7 @@ export function normalizeAnalysis(analysis, { quoteTotal, currency }) {
       damages: strings(q.damages),
       location: { city: q.location?.city ?? null, stateOrRegion: q.location?.stateOrRegion ?? null },
       services: strings(q.services),
-      quoteTotal: quoteTotal ?? num(q.quoteTotal),
+      quoteTotal: num(q.quoteTotal) ?? quoteTotal,
       currency: currency ?? isoCurrency(q.currency) ?? "USD",
       quoteRangeMin: hasRange ? Math.min(min, max) : null,
       quoteRangeMax: hasRange ? Math.max(min, max) : null,

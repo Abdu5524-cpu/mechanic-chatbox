@@ -21,7 +21,7 @@ export function buildUserMessage({ userText, quoteTotal, currency, locationHint 
   const safeText = userText.replaceAll("</quote>", "");
   return [
     `<quote>\n${safeText}\n</quote>`,
-    `Quote total detected in the text: ${quoteTotal ?? "none"}`,
+    `Possible quote total (regex hint; verify against the text): ${quoteTotal ?? "none"}`,
     `Currency: ${currency ?? "not stated (assume USD)"}`,
     `Location hint: ${locationHint ?? "none"}`,
   ].join("\n\n");

@@ -1,7 +1,10 @@
 // Deterministic extraction for facts that are stated verbatim in the user's text.
-// These run before the model call and take precedence over model output.
+// They run before the model call: the total is only a hint/fallback, the currency takes precedence.
 
-const AMOUNT = String.raw`(\$|US\$|€|£)?\s*(\d[\d,]*(?:\.\d{1,2})?)`;
+// The lookaheads reject numbers that continue in another format ("1.200,00") and numbers
+// followed by a unit ("4 tires", "3 days"): those are counts or European formatting, not totals.
+const UNIT_WORDS = String.raw`(?:tires?|tyres?|hours?|hrs?|days?|weeks?|months?|miles?|mi|km|years?|yrs?|parts?|x|%)\b`;
+const AMOUNT = String.raw`(\$|US\$|€|£)?\s*(\d[\d,]*(?:\.\d{1,2})?)(?![\d.,]?\d)(?!\s*` + UNIT_WORDS + `)`;
 const TOTAL_PATTERNS = [
   new RegExp(String.raw`(?:grand total|total due|total amount|quote total|total quote|total)\s*(?:is|was|of|to|:)?\s*` + AMOUNT, "gi"),
   new RegExp(String.raw`(?:quoted|quote|estimated|estimate|charged|charge|price)\s*(?:is|was|at|of|me|for|:)?\s*` + AMOUNT, "gi"),

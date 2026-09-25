@@ -22,6 +22,9 @@ describe("extractQuoteTotal", () => {
     "Quote for 2019, Honda Civic bumper",
     "they quoted 2000 for the job", // ambiguous without a currency symbol: leave it to the model
     "no numbers here at all",
+    "Price for 4 tires installed is $600", // counts are not prices
+    "The shop quoted 3 days and $1,200", // durations are not prices
+    "total: 1.200,00 EUR", // European formatting: don't guess, leave it to the model
   ])("returns null for %j", text => {
     expect(extractQuoteTotal(text)).toBeNull();
   });

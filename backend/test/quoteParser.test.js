@@ -64,16 +64,23 @@ describe("quoteParser", () => {
     await expect(quoteParser({ userText: TEXT })).rejects.toThrow(/did not return/);
   });
 
-  it("prefers the total stated in the text over the model's number", async () => {
+  it("prefers the model's total over the regex reading", async () => {
+    // The regex reads $1,500 here; the model read the full text and reports the final total.
     callStructured.mockResolvedValue(modelAnalysis({ quoteTotal: 1800 }));
+    const result = await quoteParser({ userText: "2019 Civic bumper. Shop quoted $1,500 for the repair and $300 more for paint." });
+    expect(result.parsedQuote.quoteTotal).toBe(1800);
+  });
+
+  it("uses the regex total only when the model returns none", async () => {
+    callStructured.mockResolvedValue(modelAnalysis({ quoteTotal: null }));
     const result = await quoteParser({ userText: "2019 Civic bumper. Shop quoted $1,500." });
     expect(result.parsedQuote.quoteTotal).toBe(1500);
   });
 
-  it("falls back to the model's total when the text has no recognizable total", async () => {
-    callStructured.mockResolvedValue(modelAnalysis({ quoteTotal: 1800 }));
-    const result = await quoteParser({ userText: "2019 Civic bumper, they want $1800 for it" });
-    expect(result.parsedQuote.quoteTotal).toBe(1800);
+  it("passes the regex total to the model only as a hint to verify", async () => {
+    callStructured.mockResolvedValue(modelAnalysis());
+    await quoteParser({ userText: "2019 Civic bumper. Shop quoted $1,500." });
+    expect(callStructured.mock.calls[0][0].user).toMatch(/hint.*verify.*1500/i);
   });
 });
 
