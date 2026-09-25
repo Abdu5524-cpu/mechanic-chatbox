@@ -118,3 +118,11 @@
     @apply bg-background text-foreground;
   }
 }
+/* QuoteCheck palette, taken from Timurid tilework (Registan, Gur-e-Amir). */
+@theme {
+  --color-lapis: #0D2464;
+  --color-firoza: #2EB5BC;
+  --color-saffron: #C8960A;
+  --color-parchment: #F5EFE0;
+  --color-ink: #2D3748;
+}
