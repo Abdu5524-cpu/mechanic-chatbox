@@ -33,7 +33,7 @@ export default function QuoteResultCard({ analysis }: { analysis: QuoteAnalysis 
         </span>
       </div>
 
-      <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         <dt className="font-semibold">Damage</dt>
         <dd className="m-0">{orNotSpecified(q.damages.join(', '))}</dd>
         <dt className="font-semibold">Services</dt>
