@@ -199,10 +199,10 @@ const VehicleVisual = ({ type, flipped = false }: { type: VehicleType; flipped?:
   <div className={`relative${flipped ? ' transform scale-x-[-1]' : ''}`}>
     {type === 'motorcycle' ? (
       <>
-        <Motorcycle className="w-40 md:w-52 drop-shadow-2xl filter brightness-110" color1="#f59e0b" color2="#ef4444" isHoverable={false} />
+        <Motorcycle className="w-40 md:w-52 drop-shadow-2xl filter brightness-110" color1="#d4a017" color2="#c4522a" isHoverable={false} />
         {/* Glowing headlight effect */}
         <motion.div
-          className="absolute left-8 top-6 w-20 h-12 bg-gradient-to-r from-yellow-400/0 via-yellow-300/40 to-transparent blur-xl"
+          className="absolute left-8 top-6 w-20 h-12 bg-gradient-to-r from-amber-400/0 via-amber-300/40 to-transparent blur-xl"
           animate={{ opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 0.8, repeat: Infinity }}
         />
@@ -213,7 +213,7 @@ const VehicleVisual = ({ type, flipped = false }: { type: VehicleType; flipped?:
           transition={{ duration: 0.3, repeat: Infinity }}
         >
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-8 h-1 bg-gradient-to-r from-orange-500/60 to-transparent rounded-full blur-sm" />
+            <div key={i} className="w-8 h-1 bg-gradient-to-r from-amber-500/60 to-transparent rounded-full blur-sm" />
           ))}
         </motion.div>
         {/* Exhaust flames */}
@@ -222,16 +222,16 @@ const VehicleVisual = ({ type, flipped = false }: { type: VehicleType; flipped?:
           animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 0.2, repeat: Infinity }}
         >
-          <div className="w-3 h-1 bg-orange-500 rounded-full blur-sm" />
-          <div className="w-2 h-1 bg-yellow-400 rounded-full blur-sm" />
+          <div className="w-3 h-1 bg-amber-500 rounded-full blur-sm" />
+          <div className="w-2 h-1 bg-amber-300 rounded-full blur-sm" />
         </motion.div>
       </>
     ) : (
       <>
-        <Car className="w-44 md:w-56 drop-shadow-2xl filter brightness-110" color1="#3b82f6" color2="#06b6d4" isHoverable={false} />
+        <Car className="w-44 md:w-56 drop-shadow-2xl filter brightness-110" color1="#00927b" color2="#d4a017" isHoverable={false} />
         {/* Glowing headlight beams */}
         <motion.div
-          className="absolute left-8 top-4 w-24 h-16 bg-gradient-to-r from-blue-200/0 via-white/30 to-transparent blur-xl"
+          className="absolute left-8 top-4 w-24 h-16 bg-gradient-to-r from-teal-200/0 via-teal-200/30 to-transparent blur-xl"
           animate={{ opacity: [0.5, 0.9, 0.5] }}
           transition={{ duration: 1, repeat: Infinity }}
         />
@@ -242,12 +242,12 @@ const VehicleVisual = ({ type, flipped = false }: { type: VehicleType; flipped?:
           transition={{ duration: 0.35, repeat: Infinity }}
         >
           {[...Array(7)].map((_, i) => (
-            <div key={i} className="w-10 h-1 bg-gradient-to-r from-cyan-400/70 to-transparent rounded-full blur-sm" />
+            <div key={i} className="w-10 h-1 bg-gradient-to-r from-teal-400/70 to-transparent rounded-full blur-sm" />
           ))}
         </motion.div>
         {/* Tire smoke */}
         <motion.div
-          className="absolute left-8 bottom-0 w-8 h-4 bg-gray-400/40 rounded-full blur-md"
+          className="absolute left-8 bottom-0 w-8 h-4 bg-amber-400/30 rounded-full blur-md"
           animate={{ scale: [0.8, 1.2, 0.8], x: [-5, 5, -5] }}
           transition={{ duration: 0.5, repeat: Infinity }}
         />
@@ -360,10 +360,10 @@ export default function VehicleDecorations() {
           onClick={() => launchRace('car', 'left-to-right')}
           whileTap={{ scale: 0.96 }}
         >
-          <Car className="w-28 md:w-36 drop-shadow-lg transition-all duration-300" color1="#ec4899" color2="#f97316" isHoverable={true} />
-          <SpeedLines className="w-12 text-pink-400/60 absolute -left-8 top-1/2 -translate-y-1/2" />
+          <Car className="w-28 md:w-36 drop-shadow-lg transition-all duration-300" color1="#c4522a" color2="#d4a017" isHoverable={true} />
+          <SpeedLines className="w-12 text-amber-500/60 absolute -left-8 top-1/2 -translate-y-1/2" />
           <motion.div
-            className="absolute inset-0 bg-pink-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10"
+            className="absolute inset-0 bg-amber-600/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10"
             transition={{ duration: 0.3 }}
           />
         </motion.button>
@@ -379,10 +379,10 @@ export default function VehicleDecorations() {
           onClick={() => launchRace('motorcycle', 'left-to-right')}
           whileTap={{ scale: 0.96 }}
         >
-          <Motorcycle className="w-24 md:w-32 drop-shadow-lg transition-all duration-300" color1="#22d3ee" color2="#3b82f6" isHoverable={true} />
-          <SpeedLines className="w-10 text-cyan-400/60 absolute -left-6 top-1/2 -translate-y-1/2" />
+          <Motorcycle className="w-24 md:w-32 drop-shadow-lg transition-all duration-300" color1="#00927b" color2="#0a9e8e" isHoverable={true} />
+          <SpeedLines className="w-10 text-teal-400/60 absolute -left-6 top-1/2 -translate-y-1/2" />
           <motion.div
-            className="absolute inset-0 bg-cyan-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10"
+            className="absolute inset-0 bg-teal-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10"
             transition={{ duration: 0.3 }}
           />
         </motion.button>
@@ -398,10 +398,10 @@ export default function VehicleDecorations() {
           onClick={() => launchRace('car', 'left-to-right')}
           whileTap={{ scale: 0.96 }}
         >
-          <Car className="w-32 md:w-40 drop-shadow-lg transition-all duration-300" color1="#a855f7" color2="#6366f1" isHoverable={true} />
-          <SpeedLines className="w-14 text-purple-400/60 absolute -left-10 top-1/2 -translate-y-1/2" />
+          <Car className="w-32 md:w-40 drop-shadow-lg transition-all duration-300" color1="#d4a017" color2="#c8952a" isHoverable={true} />
+          <SpeedLines className="w-14 text-amber-400/60 absolute -left-10 top-1/2 -translate-y-1/2" />
           <motion.div
-            className="absolute inset-0 bg-purple-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10"
+            className="absolute inset-0 bg-amber-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10"
             transition={{ duration: 0.3 }}
           />
         </motion.button>
@@ -420,10 +420,10 @@ export default function VehicleDecorations() {
           onClick={() => launchRace('motorcycle', 'right-to-left')}
           whileTap={{ scale: 0.96 }}
         >
-          <Motorcycle className="w-24 md:w-32 drop-shadow-lg transition-all duration-300" color1="#f97316" color2="#eab308" isHoverable={true} />
-          <SpeedLines className="w-10 text-orange-400/60 absolute -right-6 top-1/2 -translate-y-1/2 scale-x-[-1]" />
+          <Motorcycle className="w-24 md:w-32 drop-shadow-lg transition-all duration-300" color1="#d4a017" color2="#c4522a" isHoverable={true} />
+          <SpeedLines className="w-10 text-amber-400/60 absolute -right-6 top-1/2 -translate-y-1/2 scale-x-[-1]" />
           <motion.div
-            className="absolute inset-0 bg-orange-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10 scale-x-[-1]"
+            className="absolute inset-0 bg-orange-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10 scale-x-[-1]"
             transition={{ duration: 0.3 }}
           />
         </motion.button>
@@ -439,10 +439,10 @@ export default function VehicleDecorations() {
           onClick={() => launchRace('car', 'right-to-left')}
           whileTap={{ scale: 0.96 }}
         >
-          <Car className="w-28 md:w-36 drop-shadow-lg transition-all duration-300" color1="#10b981" color2="#22d3ee" isHoverable={true} />
-          <SpeedLines className="w-12 text-emerald-400/60 absolute -right-8 top-1/2 -translate-y-1/2 scale-x-[-1]" />
+          <Car className="w-28 md:w-36 drop-shadow-lg transition-all duration-300" color1="#0f7a6b" color2="#00927b" isHoverable={true} />
+          <SpeedLines className="w-12 text-teal-400/60 absolute -right-8 top-1/2 -translate-y-1/2 scale-x-[-1]" />
           <motion.div
-            className="absolute inset-0 bg-emerald-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10 scale-x-[-1]"
+            className="absolute inset-0 bg-teal-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10 scale-x-[-1]"
             transition={{ duration: 0.3 }}
           />
         </motion.button>
@@ -458,10 +458,10 @@ export default function VehicleDecorations() {
           onClick={() => launchRace('motorcycle', 'right-to-left')}
           whileTap={{ scale: 0.96 }}
         >
-          <Motorcycle className="w-28 md:w-36 drop-shadow-lg transition-all duration-300" color1="#ec4899" color2="#a855f7" isHoverable={true} />
-          <SpeedLines className="w-12 text-pink-400/60 absolute -right-8 top-1/2 -translate-y-1/2 scale-x-[-1]" />
+          <Motorcycle className="w-28 md:w-36 drop-shadow-lg transition-all duration-300" color1="#c4522a" color2="#9a3520" isHoverable={true} />
+          <SpeedLines className="w-12 text-orange-400/60 absolute -right-8 top-1/2 -translate-y-1/2 scale-x-[-1]" />
           <motion.div
-            className="absolute inset-0 bg-pink-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10 scale-x-[-1]"
+            className="absolute inset-0 bg-orange-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 -z-10 scale-x-[-1]"
             transition={{ duration: 0.3 }}
           />
         </motion.button>
@@ -469,17 +469,17 @@ export default function VehicleDecorations() {
 
       {/* Floating decorative elements */}
       <motion.div
-        className="absolute top-10 left-1/4 w-3 h-3 rounded-full bg-cyan-400"
+        className="absolute top-10 left-1/4 w-3 h-3 rounded-full bg-amber-400"
         animate={{ y: [0, -10, 0], opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 2, repeat: Infinity }}
       />
       <motion.div
-        className="absolute top-20 right-1/4 w-2 h-2 rounded-full bg-pink-400"
+        className="absolute top-20 right-1/4 w-2 h-2 rounded-full bg-[#c4522a]"
         animate={{ y: [0, -15, 0], opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }}
       />
       <motion.div
-        className="absolute bottom-32 left-1/3 w-4 h-4 rounded-full bg-orange-400"
+        className="absolute bottom-32 left-1/3 w-4 h-4 rounded-full bg-[#00927b]"
         animate={{ y: [0, -8, 0], opacity: [0.4, 0.8, 0.4] }}
         transition={{ duration: 1.8, repeat: Infinity, delay: 0.3 }}
       />

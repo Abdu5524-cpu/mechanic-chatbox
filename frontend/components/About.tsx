@@ -1,22 +1,37 @@
 export default function About() {
   return (
-    <section className="max-w-4xl mx-auto px-4 py-10">
-      <h2 className="text-4xl font-bold mb-4">About Us</h2>
-      <p className="text-lg mb-6 leading-relaxed">
-        Welcome to Awais Auto Repair & Tire Shop! We are dedicated to providing honest, reliable, 
-        and affordable automotive services. Our mission is to ensure that every customer 
-        drives away with peace of mind and a car that runs like new.
+    <section style={{
+      maxWidth: 896,
+      margin: '0 auto',
+      padding: '28px 32px',
+      background: '#FFFFFF',
+      border: '1px solid rgba(200,150,10,0.45)',
+      borderRadius: 4,
+      boxShadow: '0 2px 16px rgba(13,36,100,0.06)',
+    }}>
+      {/* Section heading with gold rule — like a manuscript chapter heading */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ flex: 'none', width: 4, height: 28, background: '#2EB5BC', borderRadius: 2 }} />
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0D2464', margin: 0 }}>
+          What This Is
+        </h2>
+      </div>
+
+      <p style={{ fontSize: '1rem', lineHeight: 1.75, color: '#2D3748', marginBottom: 16 }}>
+        QuoteCheck AI is an independent tool that helps vehicle owners make sense of repair
+        estimates. Paste any mechanic quote — cars, trucks, motorcycles — and the AI returns
+        a structured breakdown with typical price ranges and a plain-language risk read.
       </p>
-      <p className="text-lg mb-6 leading-relaxed">
-        Our team consists of certified mechanics with years of hands-on experience, 
-        and we use top-quality parts and the latest technology to deliver exceptional 
-        results every time.
+      <p style={{ fontSize: '1rem', lineHeight: 1.75, color: '#2D3748', marginBottom: 16 }}>
+        The goal is transparency: you should know whether a quote is in the ballpark before
+        you sign anything. No up-selling, no shop affiliation — just a second opinion powered
+        by real-world pricing data.
       </p>
-      <p className="text-lg leading-relaxed">
-        Whether you’re here for a routine check-up, a repair, or just to get an honest 
-        second opinion, we’re here to help.
+      <p style={{ fontSize: '1rem', lineHeight: 1.75, color: '#2D3748' }}>
+        Works best when you include the vehicle year, make, and model; the specific damage or
+        service; your city or region; and the total quoted. The more detail you give, the
+        sharper the analysis.
       </p>
     </section>
   )
 }
-
