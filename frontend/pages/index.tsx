@@ -1,2 +1,125 @@
+import { useEffect, useRef, useState } from 'react'
+import Head from 'next/head'
+import { AlertCircle, Github } from 'lucide-react'
+import Composer from '@/components/Composer'
+import AnalysisCard from '@/components/AnalysisCard'
+import AnalysisSkeleton from '@/components/AnalysisSkeleton'
+import { analyzeQuote, wakeBackend, type Analysis } from '@/lib/api'
 
-export { default } from '../44chat'
+type Entry =
+  | { id: number; text: string; status: 'pending' }
+  | { id: number; text: string; status: 'done'; analysis: Analysis }
+  | { id: number; text: string; status: 'error'; error: string }
+
+const REPO_URL = 'https://github.com/Abdu5524-cpu/mechanic-chatbox'
+
+export default function Home() {
+  const [input, setInput] = useState('')
+  const [entries, setEntries] = useState<Entry[]>([])
+  const nextId = useRef(1)
+  const busy = entries.some(e => e.status === 'pending')
+
+  useEffect(() => {
+    wakeBackend()
+  }, [])
+
+  const run = async (text: string, reuseId?: number) => {
+    const id = reuseId ?? nextId.current++
+    setEntries(prev =>
+      reuseId
+        ? prev.map(e => (e.id === id ? { id, text, status: 'pending' } : e))
+        : [{ id, text, status: 'pending' }, ...prev],
+    )
+    try {
+      const analysis = await analyzeQuote(text)
+      setEntries(prev => prev.map(e => (e.id === id ? { id, text, status: 'done', analysis } : e)))
+    } catch (err) {
+      const error = err instanceof Error ? err.message : 'Something went wrong. Try again.'
+      setEntries(prev => prev.map(e => (e.id === id ? { id, text, status: 'error', error } : e)))
+    }
+  }
+
+  const submit = () => {
+    const text = input.trim()
+    if (!text || busy) return
+    setInput('')
+    void run(text)
+  }
+
+  return (
+    <>
+      <Head>
+        <title>Auto Quote Analyzer</title>
+      </Head>
+
+      <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 sm:px-6">
+        <nav className="flex items-center justify-between py-5">
+          <span className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span aria-hidden className="grid size-6 place-items-center rounded-md bg-accent text-[11px] font-bold text-accent-ink">
+              AQ
+            </span>
+            Auto Quote Analyzer
+          </span>
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-sm text-ink-muted transition-colors hover:text-ink"
+          >
+            <Github className="size-4" aria-hidden />
+            Source
+          </a>
+        </nav>
+
+        <main className="flex-1 pb-16">
+          <header className="pt-10 pb-8 sm:pt-16">
+            <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+              Is this repair quote fair?
+            </h1>
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-muted text-pretty">
+              Paste a mechanic&apos;s estimate for a car or motorcycle. You&apos;ll get the typical price for that
+              work in your area, a risk read on the quote, and what to ask the shop.
+            </p>
+          </header>
+
+          <Composer value={input} onChange={setInput} onSubmit={submit} busy={busy} showExamples={entries.length === 0} />
+
+          <section aria-live="polite" aria-busy={busy} className="mt-8 space-y-8">
+            <h2 className="sr-only">Results</h2>
+            {busy && <p className="sr-only">Analyzing your quote.</p>}
+            {entries.map(entry => (
+              <div key={entry.id} className="animate-rise space-y-3">
+                <p className="line-clamp-2 border-l-2 border-line-strong pl-3 text-sm text-ink-muted whitespace-pre-line">
+                  {entry.text}
+                </p>
+                {entry.status === 'pending' && <AnalysisSkeleton />}
+                {entry.status === 'done' && <AnalysisCard analysis={entry.analysis} />}
+                {entry.status === 'error' && (
+                  <div role="alert" className="flex items-start gap-3 rounded-2xl border border-line bg-surface px-5 py-4">
+                    <AlertCircle className="mt-0.5 size-4 shrink-0 text-high" aria-hidden />
+                    <div className="flex-1 text-sm">
+                      <p>{entry.error}</p>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void run(entry.text, entry.id)}
+                        className="mt-2 font-medium underline underline-offset-4 disabled:opacity-40"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+        </main>
+
+        <footer className="border-t border-line py-6 text-xs leading-relaxed text-ink-faint">
+          Estimates are generated by Claude and can be wrong. Treat them as a starting point and get a second quote
+          before you commit to a repair.
+        </footer>
+      </div>
+    </>
+  )
+}

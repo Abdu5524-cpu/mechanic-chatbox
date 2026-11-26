@@ -1,0 +1,29 @@
+# Render Blueprint: one-click setup for both services.
+# Secrets are marked sync: false, so Render asks for them in the dashboard
+# and they are never stored in this file or in git.
+services:
+  - type: web
+    name: mechanic-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node app.js
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false # your frontend URL, e.g. https://mechanic-frontend.onrender.com
+      - key: DAILY_REQUEST_CAP
+        value: "200"
+
+  - type: web
+    name: mechanic-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: out
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false # your backend URL, e.g. https://mechanic-backend.onrender.com

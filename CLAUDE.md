@@ -14,139 +14,59 @@ Built as a portfolio project. The live UI is a themed chat interface at the fron
 
 ## Architecture
 
-Two separate services, both deployed on Render:
+Two services, both deployed on Render (see `render.yaml`):
 
 ```
-frontend/   → Next.js 15 app (port 3001 in dev)
+frontend/   → Next.js 15 static export (port 3001 in dev)
 backend/    → Express 4 API server (port 3000 in dev, $PORT in prod)
 ```
 
-They communicate over HTTP. The frontend calls the backend via `NEXT_PUBLIC_API_BASE_URL`.
-
-There is **no database in use**. `database/schema.sql` is a leftover artifact from an earlier design; it is not connected to anything and should not be wired up.
+The frontend calls the backend via `NEXT_PUBLIC_API_BASE_URL`. There is no database.
 
 ---
 
 ## Backend
 
-### Entry point
-`backend/app.js` — sets up Express with helmet, CORS, rate limiting, morgan, and mounts the router.
-
 ### Request flow
 ```
 POST /api/analyzeQuote
   → backend/intentrouter.js
-  → backend/features/analyzeQuote/analyzeQuoteController.js  (input validation + guardrails)
-  → backend/features/analyzeQuote/analyzeQuoteService.js     (orchestration)
-  → backend/features/analyzeQuote/quoteParser.js             (main LLM parse call)
-  → backend/lib/callWrapper.js                               (OpenAI Responses API wrapper)
+  → features/analyzeQuote/analyzeQuoteController.js  (validation, guardrails, daily cap)
+  → features/analyzeQuote/analyzeQuoteService.js
+  → features/analyzeQuote/quoteParser.js             (prompt, JSON schema, total cross-check)
+  → lib/claude.js                                    (Anthropic SDK call, error mapping)
 
-POST /api/chat
-  → backend/intentrouter.js
-  → backend/controllers/chat.js                              (direct OpenAI Chat Completions call)
-
-GET /health
-  → inline in app.js, returns { status: "ok" }
+GET /health → inline in app.js
 ```
 
 ### Key design decisions
-- `quoteParser` makes **two** sequential LLM calls: one to parse the quote into JSON schema, and a second (`estimateQuoteRange`) to estimate a price range if the model didn't return one. This is intentional — the range estimate uses web search via the Responses API.
-- `callWrapper` uses the **Responses API** (`openai.responses.create`), not Chat Completions. These are different APIs with different parameters.
-- `chat.js` uses the **Chat Completions API** (`openai.chat.completions.create`). Do not mix these up.
-- Input is sanitized and capped at 4000 chars / minimum 10 chars before reaching the LLM.
-
-### Models in use
-- `backend/lib/callWrapper.js` → `gpt-4.1` (Responses API)
-- `backend/controllers/chat.js` → `gpt-4o` (Chat Completions API)
+- `lib/claude.js` is the only file that talks to the Claude API. It reads `ANTHROPIC_API_KEY` from the environment, uses structured outputs (`output_config.format` with a JSON schema), effort `low`, server-side refusal fallbacks, a 45 s timeout and `max_tokens: 8000`.
+- `ModelError` carries a user-safe message and HTTP status; the controller returns it as `{ success: false, error }`.
+- `quoteParser` sets `originalText`, `currency` and `userLocationHint` itself. `quoteTotal` comes from the regex when it finds one; otherwise Claude's value is kept only if that number appears in the text.
+- `app.set("trust proxy", 1)` is required on Render so rate limiting sees visitor IPs.
 
 ### Environment variables (backend)
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `OPENAI_API_KEY` | Yes | Validated at startup |
-| `ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins. Validated at startup. Fails closed if missing. |
-| `PORT` | Injected by Render | Never set manually in production. Set to `3000` in `.env` for local dev. Frontend runs on `3001`. |
-
-See `backend/.env.example` for the template. Never commit `backend/.env`.
-
-### Run locally
-```bash
-cd backend
-npm install
-# create backend/.env from backend/.env.example, fill in your key
-node app.js
-```
+| `ANTHROPIC_API_KEY` | Yes | Validated at startup. Server only. |
+| `ALLOWED_ORIGINS` | Yes | Comma-separated CORS origins. Fails closed. |
+| `DAILY_REQUEST_CAP` | No | Default 200 analyses per UTC day. |
+| `ANTHROPIC_MODEL` | No | Default `claude-opus-5-5`. |
+| `PORT` | Injected by Render | `3000` locally. |
 
 ---
 
 ## Frontend
 
-### Entry point
-`frontend/pages/index.tsx` re-exports `frontend/44chat.tsx`. The main chat UI lives in `44chat.tsx`.
-
-### Key components
-| File | Role |
-|------|------|
-| `frontend/44chat.tsx` | Main chat page — theme switching, message state, calls `analyzeQuote` API |
-| `frontend/components/chat/ChatBubble.tsx` | Individual message bubble |
-| `frontend/components/chat/VehicleDecorations.tsx` | Decorative animated SVG elements |
-| `frontend/components/ErrorBoundary.tsx` | Class component wrapping the entire app; shows fallback UI on crash |
-| `frontend/components/QuoteForm.tsx` | Alternative chat-style quote form; not currently mounted anywhere |
-| `frontend/pages/_app.tsx` | Wraps `<Component>` in `<ErrorBoundary>` |
-
-### API call
-Both `44chat.tsx` and `QuoteForm.tsx` call `POST /api/analyzeQuote` with `{ userText }` and format the response via `formatParsedQuote()`. If the API call fails, the error message is displayed inline in the chat as a bot message.
-
-### Environment variables (frontend)
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `NEXT_PUBLIC_API_BASE_URL` | Yes in prod | Set to the Render backend URL in production. In dev, set to `http://localhost:3000`. |
-
-See `frontend/.env.example` for the template. `frontend/.env` is gitignored.
-
-### Run locally
-```bash
-cd frontend
-npm install
-# create frontend/.env from frontend/.env.example
-npm run dev     # runs on port 3001
-```
-
----
-
-## Security model
-
-- **CORS**: fail-closed. Empty `ALLOWED_ORIGINS` → all cross-origin requests denied. Non-browser requests (no `Origin` header) are always allowed.
-- **Rate limiting**: 20 requests per 15 minutes per IP on all `/api` routes. In-memory store — resets on restart, does not persist across multiple instances.
-- **Input guardrails**: controller rejects input > 4000 chars, < 10 chars, and strips null bytes / control characters before passing to the LLM.
-- **Startup validation**: app exits with code 1 if `OPENAI_API_KEY` or `ALLOWED_ORIGINS` is missing.
-- **Request size**: `express.json({ limit: "10kb" })` — sized for quote text with headroom, not a DoS vector.
-- **Security headers**: `helmet()` sets CSP, X-Frame-Options, HSTS, X-Content-Type-Options, etc.
-
----
-
-## Production deployment (Render)
-
-Both services deployed on Render.
-
-**Backend (Web Service):**
-- Build command: `npm install`
-- Start command: `node app.js`
-- Health check path: `/health`
-- Env vars to set: `OPENAI_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend Render URL)
-
-**Frontend (Static Site or Web Service):**
-- Build command: `npm run build`
-- Publish directory (static): `out/` — requires `output: 'export'` in `next.config.js`
-- Or deploy as Web Service with start command: `npm start`
-- Env var to set: `NEXT_PUBLIC_API_BASE_URL` (set to the backend Render URL)
+- `pages/index.tsx`: page and result list. `components/Composer.tsx`: textarea (Enter = newline, Ctrl/Cmd+Enter = submit). `components/AnalysisCard.tsx`, `RangeBar.tsx`, `RiskBadge.tsx`: result display. `lib/api.ts`: API client and `wakeBackend()`.
+- One theme. Colors are CSS variables in `styles/globals.css`, switched by `prefers-color-scheme`. There is no theme picker; do not add one.
+- `next.config.mjs` uses `output: "export"`. Do not add API routes or server-side code to the frontend; Claude calls belong in the backend.
 
 ---
 
 ## What not to do
 
-- Do not add database integration. The schema in `database/schema.sql` is a dead artifact.
-- Do not add `JWT_SECRET` or auth middleware. There is no user system and none is planned.
-- Do not re-add `pg` or `jsonwebtoken` to `backend/package.json`.
-- Do not use `openai.responses.create` in `chat.js` or `openai.chat.completions.create` in `callWrapper.js` — they use different APIs intentionally.
-- Do not set `ALLOWED_ORIGINS` to `*` or leave it empty. CORS is intentionally fail-closed.
-- Do not commit `backend/.env` or `frontend/.env`. Both are gitignored.
+- Do not put the Claude API key, or any Claude call, in the frontend. No `NEXT_PUBLIC_` secrets.
+- Do not commit `.env` files. Only `.env.example` is tracked.
+- Do not add a database, auth, or a general-purpose chat endpoint that relays arbitrary messages to Claude.
+- Do not set `ALLOWED_ORIGINS` to `*`.

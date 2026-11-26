@@ -7,7 +7,7 @@ import morgan from "morgan";
 import intentrouter from "./intentrouter.js";
 
 // Fail fast: refuse to start if any required env var is missing.
-const REQUIRED_ENV = ["OPENAI_API_KEY", "ALLOWED_ORIGINS"];
+const REQUIRED_ENV = ["ANTHROPIC_API_KEY", "ALLOWED_ORIGINS"];
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
     console.error(`[startup] Missing required env var: ${key}`);
@@ -19,55 +19,62 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 
+// Render (and most hosts) sit behind one reverse proxy. Trust it so req.ip is the
+// visitor's address; otherwise every visitor shares a single rate-limit bucket.
+app.set("trust proxy", Number.parseInt(process.env.TRUST_PROXY_HOPS || "1", 10));
+
 // Security headers.
 app.use(helmet());
 
-// CORS — fail closed: if origin is not in the allow-list, deny.
+// CORS: fail closed. Only origins in ALLOWED_ORIGINS may call the API from a browser.
 const allowed = new Set(
   process.env.ALLOWED_ORIGINS
     .split(",")
-    .map(s => s.trim())
+    .map(s => s.trim().replace(/\/$/, ""))
     .filter(Boolean)
 );
 
-const corsMiddleware = cors({
+app.use(cors({
   origin(origin, cb) {
-    if (!origin) return cb(null, true); // allow non-browser (SSR, curl, health checks)
-    if (allowed.has(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"));
+    // No Origin header: non-browser clients (curl, health checks). Rate limits still apply.
+    if (!origin) return cb(null, true);
+    // Disallowed origins get no CORS headers, so the browser blocks the response.
+    return cb(null, allowed.has(origin));
   },
-  credentials: true,
-});
+}));
 
-// Rate limiting: 20 requests per 15 minutes per IP across all /api routes.
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests. Please wait and try again." },
-});
-
-app.use(morgan("combined"));
-app.use(corsMiddleware);
+app.use(morgan(":method :url :status :response-time ms"));
 app.use(express.json({ limit: "10kb" }));
-app.use("/api", limiter);
 
-// Health check — no auth, no rate limiting, used by Render and uptime monitors.
+// Per-visitor limit: 20 requests per 15 minutes on all /api routes.
+app.use("/api", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, error: "Too many requests. Wait a few minutes and try again." },
+}));
+
+// Health check: no rate limiting. The frontend also pings it to wake a sleeping instance.
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// API routes.
 app.use("/api", intentrouter);
 
 app.use((req, res) => {
-  res.status(404).json({ error: "Not Found" });
+  res.status(404).json({ success: false, error: "Not Found" });
 });
 
 app.use((err, req, res, next) => {
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ success: false, error: "Invalid JSON body." });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ success: false, error: "Request too large." });
+  }
   console.error("Unhandled Error:", err);
-  res.status(500).json({ error: "Internal Server Error" });
+  res.status(500).json({ success: false, error: "Something went wrong. Try again." });
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
