@@ -5,6 +5,7 @@ const { quoteParser } = vi.hoisted(() => ({ quoteParser: vi.fn() }));
 vi.mock("../features/analyzeQuote/quoteParser.js", () => ({ quoteParser }));
 
 import { createApp } from "../createApp.js";
+import { resetDailyCap } from "../lib/dailyCap.js";
 
 const ORIGIN = "http://localhost:3001";
 const VALID = "2019 Honda Civic front bumper crack, San Diego, CA. Quoted $1,800.";
@@ -12,6 +13,8 @@ const makeApp = (opts = {}) => createApp({ allowedOrigins: [ORIGIN], logRequests
 
 beforeEach(() => {
   quoteParser.mockReset();
+  resetDailyCap();
+  delete process.env.DAILY_REQUEST_CAP;
 });
 
 describe("POST /api/analyzeQuote", () => {
@@ -124,5 +127,50 @@ describe("security middleware", () => {
   it("no longer exposes /api/chat", async () => {
     const res = await request(makeApp()).post("/api/chat").send({ messages: [] });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("hardening", () => {
+  it("accepts an ALLOWED_ORIGINS entry with a trailing slash", async () => {
+    quoteParser.mockResolvedValue({ riskLevel: "LOW" });
+    const app = createApp({ allowedOrigins: [`${ORIGIN}/`], logRequests: false });
+    const res = await request(app).post("/api/analyzeQuote").set("Origin", ORIGIN).send({ userText: VALID });
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts 4000 CJK characters (more than 10 KB of JSON)", async () => {
+    quoteParser.mockResolvedValue({ riskLevel: "LOW" });
+    const res = await request(makeApp()).post("/api/analyzeQuote").send({ userText: "修".repeat(4000) });
+    expect(res.status).toBe(200);
+  });
+
+  it("says the quote is too long when the body exceeds the size limit", async () => {
+    const res = await request(makeApp())
+      .post("/api/analyzeQuote")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({ userText: "a".repeat(40_000) }));
+    expect(res.status).toBe(413);
+    expect(res.body.error).toBe("Quote is too long.");
+  });
+
+  it("stops analyzing once the daily cap is used, without calling the model", async () => {
+    process.env.DAILY_REQUEST_CAP = "2";
+    quoteParser.mockResolvedValue({ riskLevel: "LOW" });
+    const app = makeApp({ rateLimitMax: 100 });
+    for (let i = 0; i < 2; i++) {
+      expect((await request(app).post("/api/analyzeQuote").send({ userText: VALID })).status).toBe(200);
+    }
+    const res = await request(app).post("/api/analyzeQuote").send({ userText: VALID });
+    expect(res.status).toBe(429);
+    expect(res.body.error).toMatch(/daily limit/);
+    expect(quoteParser).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not count invalid requests against the daily cap", async () => {
+    process.env.DAILY_REQUEST_CAP = "1";
+    quoteParser.mockResolvedValue({ riskLevel: "LOW" });
+    const app = makeApp({ rateLimitMax: 100 });
+    await request(app).post("/api/analyzeQuote").send({ userText: "short" });
+    expect((await request(app).post("/api/analyzeQuote").send({ userText: VALID })).status).toBe(200);
   });
 });

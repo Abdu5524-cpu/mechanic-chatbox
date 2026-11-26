@@ -1,3 +1,4 @@
+import { tryConsumeDailyCap } from "../../lib/dailyCap.js";
 import { analyzeQuoteService } from "./analyzeQuoteService.js";
 
 const MAX_LEN = 4000;
@@ -20,6 +21,11 @@ async function analyzeQuoteController(req, res, next) {
 
     if (sanitized.length < MIN_LEN) {
       return res.status(400).json({ success: false, error: "Input too short to analyze" });
+    }
+
+    // Counted only for valid requests, so bad input can't use up the day's budget.
+    if (!tryConsumeDailyCap()) {
+      return res.status(429).json({ success: false, error: "The analyzer has reached its daily limit. Please try again tomorrow." });
     }
 
     const result = await analyzeQuoteService({ userText: sanitized });

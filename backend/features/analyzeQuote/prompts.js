@@ -18,7 +18,7 @@ Rules:
 - Use null for anything not stated and not reasonably inferable. Never invent a shop name.`;
 
 export function buildUserMessage({ userText, quoteTotal, currency, locationHint }) {
-  const safeText = userText.replaceAll("</quote>", "");
+  const safeText = userText.replace(/<\s*\/?\s*quote\s*>/gi, ""); // the tags are ours; strip any the user typed
   return [
     `<quote>\n${safeText}\n</quote>`,
     `Possible quote total (regex hint; verify against the text): ${quoteTotal ?? "none"}`,

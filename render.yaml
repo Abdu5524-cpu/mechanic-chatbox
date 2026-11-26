@@ -1,0 +1,32 @@
+# Render Blueprint: New -> Blueprint -> pick this repo.
+# Secrets use sync: false, so Render prompts for them in the dashboard; they never live in git.
+services:
+  - type: web
+    name: mechanic-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node app.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false # e.g. https://mechanic-frontend.onrender.com (no trailing slash needed)
+      - key: DAILY_REQUEST_CAP
+        value: "200"
+
+  - type: web
+    name: mechanic-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: out
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false # e.g. https://mechanic-backend.onrender.com

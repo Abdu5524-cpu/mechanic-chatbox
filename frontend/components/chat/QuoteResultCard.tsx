@@ -79,7 +79,7 @@ export default function QuoteResultCard({ analysis }: { analysis: QuoteAnalysis 
         <div>
           <h4 className="m-0 mb-1 text-xs font-bold uppercase tracking-wider text-saffron">Why</h4>
           <ul className="m-0 list-disc space-y-1 pl-5">
-            {analysis.reasons.map(reason => <li key={reason}>{reason}</li>)}
+            {analysis.reasons.map((reason, i) => <li key={i}>{reason}</li>)}
           </ul>
         </div>
       )}
@@ -88,7 +88,7 @@ export default function QuoteResultCard({ analysis }: { analysis: QuoteAnalysis 
         <div>
           <h4 className="m-0 mb-1 text-xs font-bold uppercase tracking-wider text-saffron">What to do</h4>
           <ul className="m-0 list-disc space-y-1 pl-5">
-            {analysis.recommendations.map(rec => <li key={rec}>{rec}</li>)}
+            {analysis.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
           </ul>
         </div>
       )}

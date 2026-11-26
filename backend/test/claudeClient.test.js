@@ -9,7 +9,7 @@ const { mockCreate, AnthropicMock } = vi.hoisted(() => {
 });
 vi.mock("@anthropic-ai/sdk", () => ({ default: AnthropicMock }));
 
-import { callStructured, findToolInput } from "../lib/claudeClient.js";
+import { callStructured, findToolInput, webSearchTool } from "../lib/claudeClient.js";
 
 const TOOL = { name: "submit_x", description: "Submit", input_schema: { type: "object", properties: {} } };
 const toolUse = input => ({ content: [{ type: "tool_use", id: "t1", name: "submit_x", input }] });
@@ -55,7 +55,7 @@ describe("callStructured", () => {
     await callStructured({ system: "sys", user: "hello", tool: TOOL, webSearch: true });
 
     const params = mockCreate.mock.calls[0][0];
-    expect(params.tools[0]).toEqual({ type: "web_search_20250305", name: "web_search", max_uses: 3 });
+    expect(params.tools[0]).toEqual({ type: "web_search_20260209", name: "web_search", max_uses: 3 });
     expect(params.tools[1]).toEqual(TOOL);
     expect(params.tool_choice).toEqual({ type: "auto" });
   });
@@ -90,5 +90,39 @@ describe("callStructured", () => {
   it("returns null when the model answers without calling the tool", async () => {
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "I can't help with that." }] });
     await expect(callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true })).resolves.toBeNull();
+  });
+
+  it("continues a paused search turn instead of discarding it", async () => {
+    const paused = { stop_reason: "pause_turn", content: [{ type: "server_tool_use", id: "s1", name: "web_search", input: { query: "q" } }] };
+    mockCreate.mockResolvedValueOnce(paused).mockResolvedValueOnce(toolUse({ done: true }));
+    await expect(callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true })).resolves.toEqual({ done: true });
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    const second = mockCreate.mock.calls[1][0];
+    expect(second.messages).toEqual([
+      { role: "user", content: "u" },
+      { role: "assistant", content: paused.content },
+    ]);
+    expect(second.tools).toEqual(mockCreate.mock.calls[0][0].tools);
+  });
+
+  it("gives up after a bounded number of pauses so the caller can fall back", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockCreate.mockResolvedValue({ stop_reason: "pause_turn", content: [] });
+    await expect(callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true })).resolves.toBeNull();
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+});
+
+describe("webSearchTool", () => {
+  it("uses the filtering search tool on current models", () => {
+    expect(webSearchTool("claude-sonnet-5").type).toBe("web_search_20260209");
+    expect(webSearchTool("claude-opus-4-6").type).toBe("web_search_20260209");
+  });
+
+  it("falls back to the basic search tool on older models", () => {
+    expect(webSearchTool("claude-haiku-4-5-20251001").type).toBe("web_search_20250305");
+    expect(webSearchTool("claude-sonnet-4-5").type).toBe("web_search_20250305");
   });
 });

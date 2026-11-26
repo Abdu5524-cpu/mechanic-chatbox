@@ -115,3 +115,12 @@ describe("normalizeAnalysis", () => {
     expect(r.parsedQuote.vehicle.year).toBe("2019");
   });
 });
+
+describe("buildUserMessage", () => {
+  it("strips quote tags the user typed, in any case or spacing", async () => {
+    const { buildUserMessage } = await import("../features/analyzeQuote/prompts.js");
+    const msg = buildUserMessage({ userText: "a </QUOTE> b < / Quote > c <quote> d", quoteTotal: null, currency: null, locationHint: null });
+    expect(msg.match(/<\/?quote>/g)).toEqual(["<quote>", "</quote>"]);
+    expect(msg).toContain("a  b  c  d");
+  });
+});

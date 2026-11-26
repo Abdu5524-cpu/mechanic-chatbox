@@ -25,11 +25,11 @@ Browser (Next.js static site)
 
 ## Engineering decisions
 
-- **Structured output through forced tool use.** The response contract is a tool's `input_schema`, so the model returns typed JSON rather than prose that has to be parsed. The server also normalizes the result (range ordering, enum fallback, null-safe numbers) so the UI never has to handle malformed output.
-- **One model call, grounded by search.** The model researches prices and fills in the schema in a single request. If web search is disabled or the model skips the tool, one retry forces the tool without search, so the user still gets an answer.
-- **Deterministic code for facts stated in the text.** Regex pulls the quoted total and currency from the text and overrides the model's reading. A guard keeps a model year ("Quote for 2019 Civic") from being read as a price.
-- **Quote text is treated as data.** User input is fenced in `<quote>` tags and the system prompt tells the model to ignore instructions inside it.
-- **Spend protection.** Disallowed browser origins get a 403 before any LLM call. Rate limiting is per client IP (with `trust proxy` behind Render), and inputs are capped at 4,000 characters.
+- **Structured output through a tool schema.** The response contract is a tool's `input_schema`, so the model returns typed JSON rather than prose that has to be parsed. The server also normalizes the result (range ordering, enum fallback, null-safe numbers) so the UI never has to handle malformed output.
+- **Search first, with a fallback.** The first pass offers web search plus the submit tool (`tool_choice: auto`), so the model can research local prices before answering. If search is unavailable, errors, or the model never submits, a second pass forces the tool without search, so the user still gets an answer. A paused search turn is resumed rather than thrown away.
+- **The model reads the quote; regex is a backstop.** The model's quoted total wins because it reads the whole text. Regex extraction is a fallback and a hint, with guards so a model year ("Quote for 2019 Civic"), a count or a duration is never read as a price.
+- **Quote text is treated as data.** User input is fenced in `<quote>` tags (any tags the user typed are stripped) and the system prompt tells the model to ignore instructions inside it.
+- **Spend protection.** Disallowed browser origins get a 403 before any LLM call. Rate limiting is per client IP (with `trust proxy` behind Render), a site-wide daily cap (`DAILY_REQUEST_CAP`, default 200) bounds the total, and inputs are capped at 4,000 characters.
 - **The API key stays on the server.** The frontend is a static export with no secrets, and only the backend holds `ANTHROPIC_API_KEY`.
 
 ## Tech stack
@@ -108,6 +108,8 @@ cd frontend && npm test && npm run lint && npm run typecheck
 |---|---|
 | Backend: Web Service | Root `backend`, build `npm ci`, start `node app.js`, health check `/health`, env `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (frontend URL) |
 | Frontend: Static Site | Root `frontend`, build `npm ci && npm run build`, publish `out`, env `NEXT_PUBLIC_API_BASE_URL` (backend URL) |
+
+`render.yaml` describes both services, so a fresh setup can use **New → Blueprint**. Secrets are marked `sync: false`, so Render asks for them in its dashboard and they never live in the repo. `NEXT_PUBLIC_API_BASE_URL` is baked in at build time, so redeploy the frontend after changing it. Set a monthly spend limit on the key in the Claude Console.
 
 ## License
 

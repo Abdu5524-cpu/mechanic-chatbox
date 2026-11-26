@@ -5,8 +5,11 @@ import helmet from "helmet";
 import morgan from "morgan";
 import intentrouter from "./intentrouter.js";
 
+// Browsers send Origin without a trailing slash; tolerate one in the configured list.
+const normalizeOrigin = o => o.trim().replace(/\/+$/, "");
+
 export function createApp({ allowedOrigins, rateLimitMax = 20, logRequests = true }) {
-  const allowed = new Set(allowedOrigins);
+  const allowed = new Set(allowedOrigins.map(normalizeOrigin));
   const app = express();
 
   // Render sits one proxy hop in front of us; without this every client shares the proxy's IP.
@@ -26,7 +29,8 @@ export function createApp({ allowedOrigins, rateLimitMax = 20, logRequests = tru
   });
   app.use(cors({ origin: [...allowed] }));
 
-  app.use(express.json({ limit: "10kb" }));
+  // 4000 characters of CJK text is ~12 KB of UTF-8 JSON; the controller enforces the character limit.
+  app.use(express.json({ limit: "32kb" }));
   app.use(
     "/api",
     rateLimit({
@@ -52,7 +56,8 @@ export function createApp({ allowedOrigins, rateLimitMax = 20, logRequests = tru
   app.use((err, req, res, next) => {
     const status = Number.isInteger(err.status) && err.status < 500 ? err.status : 500;
     if (status === 500) console.error("Unhandled error:", err);
-    res.status(status).json({ error: status === 500 ? "Internal Server Error" : "Bad request" });
+    const error = status === 500 ? "Internal Server Error" : status === 413 ? "Quote is too long." : "Bad request";
+    res.status(status).json({ error });
   });
 
   return app;

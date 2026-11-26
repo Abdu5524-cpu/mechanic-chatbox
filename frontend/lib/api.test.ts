@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { analyzeQuote } from './api'
+import { analyzeQuote, wakeBackend } from './api'
 import type { QuoteAnalysis } from './quoteTypes'
 
 const analysis: QuoteAnalysis = {
@@ -55,5 +55,23 @@ describe('analyzeQuote', () => {
   it('explains network failures such as a sleeping backend', async () => {
     const fetchImpl = mockFetch(async () => { throw new TypeError('Failed to fetch') })
     await expect(analyzeQuote('x'.repeat(20), fetchImpl)).rejects.toThrow(/Couldn't reach the server/)
+  })
+
+  it('does not double the slash when the base URL ends with one', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'https://api.example.com/')
+    const fetchImpl = mockFetch(async () => jsonResponse(200, { success: true, parsed: analysis }))
+    await analyzeQuote('2019 Civic bumper $1800', fetchImpl)
+    expect(fetchImpl).toHaveBeenCalledWith('https://api.example.com/api/analyzeQuote', expect.anything())
+    vi.unstubAllEnvs()
+  })
+})
+
+describe('wakeBackend', () => {
+  it('pings /health and swallows failures', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'https://api.example.com')
+    const fetchImpl = mockFetch(async () => { throw new Error('offline') })
+    expect(() => wakeBackend(fetchImpl)).not.toThrow()
+    expect(fetchImpl).toHaveBeenCalledWith('https://api.example.com/health')
+    vi.unstubAllEnvs()
   })
 })

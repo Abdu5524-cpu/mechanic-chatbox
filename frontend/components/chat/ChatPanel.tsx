@@ -6,7 +6,7 @@ import { Send } from 'lucide-react'
 import ChatBubble from './ChatBubble'
 import QuoteResultCard from './QuoteResultCard'
 import CornerOrnament from '../decor/CornerOrnament'
-import { analyzeQuote } from '@/lib/api'
+import { analyzeQuote, wakeBackend } from '@/lib/api'
 import type { ChatMessage } from '@/lib/quoteTypes'
 
 const MIN_LEN = 10
@@ -33,6 +33,10 @@ const DOTS = [
 
 const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
+// crypto.randomUUID only exists in secure contexts; plain-http LAN dev URLs don't have it.
+let fallbackId = 0
+const newId = () => globalThis.crypto?.randomUUID?.() ?? `m${Date.now()}-${++fallbackId}`
+
 function StarIcon() {
   return (
     <svg viewBox="0 0 16 16" width="12" height="12" className="flex-none opacity-60" aria-hidden="true">
@@ -58,7 +62,7 @@ function TypingIndicator() {
             />
           ))}
         </div>
-        <span className="text-xs text-lapis/70">Researching local prices; this can take up to 30 seconds…</span>
+        <span className="text-xs text-lapis/70">Researching local prices; this usually takes under a minute…</span>
       </div>
     </motion.div>
   )
@@ -69,6 +73,9 @@ export default function ChatPanel() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => wakeBackend(), [])
 
   useEffect(() => {
     const el = listRef.current
@@ -77,26 +84,25 @@ export default function ChatPanel() {
 
   const trimmed = input.trim()
   const canSend = trimmed.length >= MIN_LEN && !isLoading
-  const hint =
-    trimmed.length > 0 && trimmed.length < MIN_LEN
-      ? 'Add a bit more detail: vehicle, damage, and price.'
-      : `${input.length} / ${MAX_LEN}`
+  const tooShort = trimmed.length > 0 && trimmed.length < MIN_LEN
 
   async function send(text: string) {
     const userText = text.trim()
     if (userText.length < MIN_LEN || userText.length > MAX_LEN || isLoading) return
 
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', time: now(), text: userText }])
+    setMessages(prev => [...prev, { id: newId(), role: 'user', time: now(), text: userText }])
     setInput('')
     setIsLoading(true)
     try {
       const analysis = await analyzeQuote(userText)
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'bot', time: now(), analysis }])
+      setMessages(prev => [...prev, { id: newId(), role: 'bot', time: now(), analysis }])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'bot', time: now(), text: message, isError: true }])
+      setMessages(prev => [...prev, { id: newId(), role: 'bot', time: now(), text: message, isError: true }])
     } finally {
       setIsLoading(false)
+      // The textarea was disabled while loading, which drops focus; give it back for the next quote.
+      requestAnimationFrame(() => inputRef.current?.focus())
     }
   }
 
@@ -167,6 +173,7 @@ export default function ChatPanel() {
           <div className="flex items-end gap-2.5">
             <textarea
               id="quote-input"
+              ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => {
@@ -192,8 +199,10 @@ export default function ChatPanel() {
               <Send className="size-[18px]" aria-hidden="true" />
             </motion.button>
           </div>
-          <p className="mb-0 mt-1.5 text-right text-[10px] text-lapis/60" aria-live="polite">
-            {hint}
+          {/* Only the guidance is announced; a live counter would speak on every keystroke. */}
+          <p className="mb-0 mt-1.5 flex justify-end gap-3 text-[10px] text-lapis/60">
+            <span aria-live="polite">{tooShort ? 'Add a bit more detail: vehicle, damage, and price.' : ''}</span>
+            <span>{input.length} / {MAX_LEN}</span>
           </p>
         </form>
       </div>
