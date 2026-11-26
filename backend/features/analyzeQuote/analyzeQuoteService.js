@@ -1,29 +1,14 @@
 import { quoteParser } from "./quoteParser.js";
 
-export async function analyzeQuoteService(input) {
-  const { userText } = input;
+const USER_FACING_ERROR = "We couldn't analyze that quote right now. Please try again in a moment.";
 
-  const parsed = await quoteParser({ userText });
-
-  if (parsed === null || parsed === undefined) {
-    return {
-      success: false,
-      stage: "quoteParser",
-      error: "parser failed to extract quote information",
-    };
+// Error boundary for the analysis pipeline: log the real cause, return a generic message.
+export async function analyzeQuoteService({ userText }) {
+  try {
+    const parsed = await quoteParser({ userText });
+    return { success: true, parsed };
+  } catch (err) {
+    console.error("[analyzeQuote] analysis failed:", err);
+    return { success: false, error: USER_FACING_ERROR };
   }
-
-  // Guard: quoteParser's catch branch returns { error: ... } on failure.
-  if (parsed.error) {
-    return {
-      success: false,
-      stage: "quoteParser",
-      error: parsed.error,
-    };
-  }
-
-  return {
-    success: true,
-    parsed,
-  };
 }

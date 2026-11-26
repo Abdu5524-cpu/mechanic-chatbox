@@ -1,0 +1,128 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { mockCreate, AnthropicMock } = vi.hoisted(() => {
+  const mockCreate = vi.fn();
+  const AnthropicMock = vi.fn(function () {
+    this.messages = { create: mockCreate };
+  });
+  return { mockCreate, AnthropicMock };
+});
+vi.mock("@anthropic-ai/sdk", () => ({ default: AnthropicMock }));
+
+import { callStructured, findToolInput, webSearchTool } from "../lib/claudeClient.js";
+
+const TOOL = { name: "submit_x", description: "Submit", input_schema: { type: "object", properties: {} } };
+const toolUse = input => ({ content: [{ type: "tool_use", id: "t1", name: "submit_x", input }] });
+
+beforeEach(() => {
+  mockCreate.mockReset();
+  delete process.env.ANTHROPIC_MODEL;
+});
+
+describe("findToolInput", () => {
+  it("returns the input of the named tool_use block, skipping search and text blocks", () => {
+    const response = {
+      content: [
+        { type: "server_tool_use", name: "web_search", input: { query: "civic bumper cost" } },
+        { type: "text", text: "Here is my analysis." },
+        { type: "tool_use", name: "submit_x", input: { ok: true } },
+      ],
+    };
+    expect(findToolInput(response, "submit_x")).toEqual({ ok: true });
+  });
+
+  it("returns null when the tool was not called", () => {
+    expect(findToolInput({ content: [{ type: "text", text: "hi" }] }, "submit_x")).toBeNull();
+  });
+});
+
+describe("callStructured", () => {
+  it("forces the submit tool when web search is off", async () => {
+    mockCreate.mockResolvedValue(toolUse({ a: 1 }));
+    await expect(callStructured({ system: "sys", user: "hello", tool: TOOL })).resolves.toEqual({ a: 1 });
+
+    const params = mockCreate.mock.calls[0][0];
+    expect(params.model).toBe("claude-sonnet-5");
+    expect(params.max_tokens).toBe(16000); // room for thinking + search reasoning + the tool input
+    expect(params.system).toBe("sys");
+    expect(params.messages).toEqual([{ role: "user", content: "hello" }]);
+    expect(params.tools).toEqual([TOOL]);
+    expect(params.tool_choice).toEqual({ type: "tool", name: "submit_x" });
+  });
+
+  it("adds the web search tool and lets the model choose when web search is on", async () => {
+    mockCreate.mockResolvedValue(toolUse({ a: 1 }));
+    await callStructured({ system: "sys", user: "hello", tool: TOOL, webSearch: true });
+
+    const params = mockCreate.mock.calls[0][0];
+    expect(params.tools[0]).toEqual({ type: "web_search_20260209", name: "web_search", max_uses: 3 });
+    expect(params.tools[1]).toEqual(TOOL);
+    expect(params.tool_choice).toEqual({ type: "auto" });
+  });
+
+  it("does not auto-retry the slow web-search pass (the forced fallback is the retry)", async () => {
+    mockCreate.mockResolvedValue(toolUse({}));
+    await callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true });
+    expect(mockCreate.mock.calls[0][1]).toEqual({ maxRetries: 0 });
+  });
+
+  it("keeps the client's default retry for the forced pass", async () => {
+    mockCreate.mockResolvedValue(toolUse({}));
+    await callStructured({ system: "s", user: "u", tool: TOOL });
+    expect(mockCreate.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("logs stop_reason and usage when the model does not call the tool", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockCreate.mockResolvedValue({ stop_reason: "max_tokens", usage: { output_tokens: 16000 }, content: [{ type: "text", text: "..." }] });
+    await callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("max_tokens"), expect.objectContaining({ output_tokens: 16000 }));
+    warn.mockRestore();
+  });
+
+  it("uses ANTHROPIC_MODEL when set", async () => {
+    process.env.ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+    mockCreate.mockResolvedValue(toolUse({}));
+    await callStructured({ system: "s", user: "u", tool: TOOL });
+    expect(mockCreate.mock.calls[0][0].model).toBe("claude-haiku-4-5-20251001");
+  });
+
+  it("returns null when the model answers without calling the tool", async () => {
+    mockCreate.mockResolvedValue({ content: [{ type: "text", text: "I can't help with that." }] });
+    await expect(callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true })).resolves.toBeNull();
+  });
+
+  it("continues a paused search turn instead of discarding it", async () => {
+    const paused = { stop_reason: "pause_turn", content: [{ type: "server_tool_use", id: "s1", name: "web_search", input: { query: "q" } }] };
+    mockCreate.mockResolvedValueOnce(paused).mockResolvedValueOnce(toolUse({ done: true }));
+    await expect(callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true })).resolves.toEqual({ done: true });
+
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    const second = mockCreate.mock.calls[1][0];
+    expect(second.messages).toEqual([
+      { role: "user", content: "u" },
+      { role: "assistant", content: paused.content },
+    ]);
+    expect(second.tools).toEqual(mockCreate.mock.calls[0][0].tools);
+  });
+
+  it("gives up after a bounded number of pauses so the caller can fall back", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockCreate.mockResolvedValue({ stop_reason: "pause_turn", content: [] });
+    await expect(callStructured({ system: "s", user: "u", tool: TOOL, webSearch: true })).resolves.toBeNull();
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+});
+
+describe("webSearchTool", () => {
+  it("uses the filtering search tool on current models", () => {
+    expect(webSearchTool("claude-sonnet-5").type).toBe("web_search_20260209");
+    expect(webSearchTool("claude-opus-4-6").type).toBe("web_search_20260209");
+  });
+
+  it("falls back to the basic search tool on older models", () => {
+    expect(webSearchTool("claude-haiku-4-5-20251001").type).toBe("web_search_20250305");
+    expect(webSearchTool("claude-sonnet-4-5").type).toBe("web_search_20250305");
+  });
+});

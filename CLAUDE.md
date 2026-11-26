@@ -1,152 +1,90 @@
-# CLAUDE.md — Mechanic Chatbox
+# CLAUDE.md: QuoteCheck AI (repo: mechanic-chatbox)
 
-This file gives Claude Code context about the project so it can assist effectively without re-exploring the codebase from scratch each session.
+Context for Claude Code sessions in this repo.
 
----
+## Where we left off (updated 2026-11-26)
 
-## What This Project Is
+**Goal:** make this presentable as a resume project, and switch the backend from OpenAI to Claude.
 
-A vehicle repair quote analysis tool. Users paste or describe a mechanic quote (vehicle, damage, location, price), and the app returns a structured breakdown: parsed vehicle/damage info, typical price range, risk level (LOW/MEDIUM/HIGH), and recommendations.
+**State:**
+- Work is on branch `health-and-claude`, pushed, with a PR to `main`. (An earlier parallel PR, `claude/redesign-and-claude-backend`, is superseded by this branch.)
+- The plan is `docs/superpowers/plans/2026-09-25-cleanup-and-claude-migration.md`. Tasks 1–13 are done; Task 14 (deploy) is not.
+- The execution ledger is `.superpowers/sdd/2026-09-25-cleanup-and-claude-migration/progress.md` (gitignored). It records every ruling made and every deferred Minor finding.
+- A fresh whole-branch review found no Critical issues. Its two Important findings are fixed, with tests (`fe0f814`, `b403166`).
+- Tests: backend 72/72. Frontend: 15 tests, plus lint, typecheck and build, all green.
+- 2026-11-26: the deferred Minor list below was worked through (pause_turn, web_search_20260209, tag stripping, 32 KB body + 413 message, trailing-slash normalization, safe ids, a11y and focus, loading copy, README decisions). Also added a site-wide daily cap (`DAILY_REQUEST_CAP`, default 200), a `/health` wake-up ping on page load, and `render.yaml`.
 
-Built as a portfolio project. The live UI is a themed chat interface at the frontend root.
+**Not yet verified with a real API key.** Everything model-facing was tested with mocks, an invalid key, or a stub backend:
+- `backend/.env` still has `OPENAI_API_KEY`. The user must replace it with `ANTHROPIC_API_KEY=sk-ant-...`. Never read or print `.env` values; checking the variable names is fine.
+- Once the key is in, run one real quote per example prompt. Check that the first pass returns `stop_reason: "tool_use"`, that `[quoteParser] web-search pass failed` and `[claudeClient] ... not called` don't appear in the log, and that it finishes in about 30s. If web search fails, enable it for the org in the Anthropic Console.
+- `docs/screenshot.png` was captured against a stub backend with sample data. Re-capture it from a real result.
 
----
+**Next steps (Task 14). These act outside the repo, so ask the user before each one:**
+1. Push `health-and-claude`, open a PR to `main`, and wait for CI (`.github/workflows/ci.yml`) to pass, then merge.
+2. Render backend: add `ANTHROPIC_API_KEY`, delete `OPENAI_API_KEY`, and set `ALLOWED_ORIGINS=https://mechanic-frontend.onrender.com` (a trailing slash is now tolerated).
+3. Render frontend: it must be a **Static Site** (build `npm ci && npm run build`, publish `out`, root `frontend`). `next.config.js` uses `output: "export"`, so `next start` no longer works. If it is currently a Web Service, create a Static Site instead. `NEXT_PUBLIC_API_BASE_URL` is baked in at build time.
+4. After deploying, compare the backend's logged `req.ip` with your own IP. If they differ, `trust proxy` = 1 is wrong for Render, and all users share one rate limit.
+5. Optional: add an uptime ping on `/health` every 10 min. Revoke the old OpenAI key.
+
+**Known issues deferred (Minor):** none open. Re-check `trust proxy` (step 4) after the first deploy.
+
+**Decisions already made (don't re-litigate):**
+- `/api/chat` was deleted, not fixed.
+- Default model is `claude-sonnet-5`.
+- The product name is "QuoteCheck AI"; the repo slug stays `mechanic-chatbox`.
+- `frontend-v0/` was deleted; its contents are in commit `ea42d50`.
+
+## What this is
+
+A portfolio app that analyzes auto repair quotes. The user pastes a quote; the backend asks Claude to parse it, research typical local prices with web search, and return a structured verdict (range, LOW/MEDIUM/HIGH risk, reasons, recommendations). The frontend renders it as a result card in a themed chat UI.
 
 ## Architecture
 
-Two separate services, both deployed on Render:
-
 ```
-frontend/   → Next.js 15 app (port 3001 in dev)
-backend/    → Express 4 API server (port 3000 in dev, $PORT in prod)
+frontend/  Next.js Pages Router, static export (out/), port 3001 in dev
+backend/   Express 4 API, port 3000 in dev ($PORT on Render)
 ```
 
-They communicate over HTTP. The frontend calls the backend via `NEXT_PUBLIC_API_BASE_URL`.
-
-There is **no database in use**. `database/schema.sql` is a leftover artifact from an earlier design; it is not connected to anything and should not be wired up.
-
----
+The frontend calls `${NEXT_PUBLIC_API_BASE_URL}/api/analyzeQuote`. There is no database and no auth.
 
 ## Backend
 
-### Entry point
-`backend/app.js` — sets up Express with helmet, CORS, rate limiting, morgan, and mounts the router.
-
-### Request flow
-```
-POST /api/analyzeQuote
-  → backend/intentrouter.js
-  → backend/features/analyzeQuote/analyzeQuoteController.js  (input validation + guardrails)
-  → backend/features/analyzeQuote/analyzeQuoteService.js     (orchestration)
-  → backend/features/analyzeQuote/quoteParser.js             (main LLM parse call)
-  → backend/lib/callWrapper.js                               (OpenAI Responses API wrapper)
-
-POST /api/chat
-  → backend/intentrouter.js
-  → backend/controllers/chat.js                              (direct OpenAI Chat Completions call)
-
-GET /health
-  → inline in app.js, returns { status: "ok" }
-```
-
-### Key design decisions
-- `quoteParser` makes **two** sequential LLM calls: one to parse the quote into JSON schema, and a second (`estimateQuoteRange`) to estimate a price range if the model didn't return one. This is intentional — the range estimate uses web search via the Responses API.
-- `callWrapper` uses the **Responses API** (`openai.responses.create`), not Chat Completions. These are different APIs with different parameters.
-- `chat.js` uses the **Chat Completions API** (`openai.chat.completions.create`). Do not mix these up.
-- Input is sanitized and capped at 4000 chars / minimum 10 chars before reaching the LLM.
-
-### Models in use
-- `backend/lib/callWrapper.js` → `gpt-4.1` (Responses API)
-- `backend/controllers/chat.js` → `gpt-4o` (Chat Completions API)
-
-### Environment variables (backend)
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `OPENAI_API_KEY` | Yes | Validated at startup |
-| `ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins. Validated at startup. Fails closed if missing. |
-| `PORT` | Injected by Render | Never set manually in production. Set to `3000` in `.env` for local dev. Frontend runs on `3001`. |
-
-See `backend/.env.example` for the template. Never commit `backend/.env`.
-
-### Run locally
-```bash
-cd backend
-npm install
-# create backend/.env from backend/.env.example, fill in your key
-node app.js
-```
-
----
+- `app.js`: entry point. Validates env (`ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS`), then `createApp(...).listen`.
+- `createApp.js`: helmet → morgan → origin allow-list (403) → cors → json(32kb) → rate limit (/api) → routes → 404 → error handler (keeps 4xx from body-parser).
+- `features/analyzeQuote/`: controller (validation, sanitization) → service (error boundary, generic message) → `quoteParser.js` (orchestration + `normalizeAnalysis`), plus `quoteExtractors.js`, `prompts.js`, `schema.js`.
+- `lib/claudeClient.js`: the only place that talks to the Anthropic SDK. `callStructured({ system, user, tool, webSearch })` returns the forced tool's input, or null.
+- The model is `claude-sonnet-5` by default; override it with `ANTHROPIC_MODEL`.
+- Tests: `backend/test/*.test.js` (Vitest + Supertest). The SDK and the parser are mocked; the tests never hit the network. In `beforeEach`, use a block body (`() => { mock.mockReset(); }`): a returned function is run as a teardown.
 
 ## Frontend
 
-### Entry point
-`frontend/pages/index.tsx` re-exports `frontend/44chat.tsx`. The main chat UI lives in `44chat.tsx`.
+- `pages/index.tsx` re-exports `components/ChatPage.tsx`.
+- `components/chat/ChatPanel.tsx` holds the chat state and input; `QuoteResultCard.tsx` renders an analysis; `ChatBubble.tsx` is the bubble shell.
+- `components/decor/*` are purely decorative SVGs (moved verbatim; don't restyle them casually). `MonumentIllustrations` is hidden below `xl`.
+- `lib/api.ts` (fetch plus user-facing error mapping), `lib/formatQuote.ts` (money, range bar math), `lib/quoteTypes.ts` (mirrors the backend `normalizeAnalysis` output; keep them in sync).
+- Styling: Tailwind v4 with palette tokens in `styles/globals.css` (`lapis`, `firoza`, `saffron`, `parchment`, `ink`). No `tailwind.config.js`. Don't put `m-0` on children of `space-y-*` containers; it cancels the spacing.
 
-### Key components
-| File | Role |
-|------|------|
-| `frontend/44chat.tsx` | Main chat page — theme switching, message state, calls `analyzeQuote` API |
-| `frontend/components/chat/ChatBubble.tsx` | Individual message bubble |
-| `frontend/components/chat/VehicleDecorations.tsx` | Decorative animated SVG elements |
-| `frontend/components/ErrorBoundary.tsx` | Class component wrapping the entire app; shows fallback UI on crash |
-| `frontend/components/QuoteForm.tsx` | Alternative chat-style quote form; not currently mounted anywhere |
-| `frontend/pages/_app.tsx` | Wraps `<Component>` in `<ErrorBoundary>` |
+## Commands
 
-### API call
-Both `44chat.tsx` and `QuoteForm.tsx` call `POST /api/analyzeQuote` with `{ userText }` and format the response via `formatParsedQuote()`. If the API call fails, the error message is displayed inline in the chat as a bot message.
-
-### Environment variables (frontend)
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `NEXT_PUBLIC_API_BASE_URL` | Yes in prod | Set to the Render backend URL in production. In dev, set to `http://localhost:3000`. |
-
-See `frontend/.env.example` for the template. `frontend/.env` is gitignored.
-
-### Run locally
 ```bash
-cd frontend
-npm install
-# create frontend/.env from frontend/.env.example
-npm run dev     # runs on port 3001
+cd backend && npm run dev | npm test
+cd frontend && npm run dev | npm test | npm run lint | npm run typecheck | npm run build
 ```
 
----
+## Environment
 
-## Security model
-
-- **CORS**: fail-closed. Empty `ALLOWED_ORIGINS` → all cross-origin requests denied. Non-browser requests (no `Origin` header) are always allowed.
-- **Rate limiting**: 20 requests per 15 minutes per IP on all `/api` routes. In-memory store — resets on restart, does not persist across multiple instances.
-- **Input guardrails**: controller rejects input > 4000 chars, < 10 chars, and strips null bytes / control characters before passing to the LLM.
-- **Startup validation**: app exits with code 1 if `OPENAI_API_KEY` or `ALLOWED_ORIGINS` is missing.
-- **Request size**: `express.json({ limit: "10kb" })` — sized for quote text with headroom, not a DoS vector.
-- **Security headers**: `helmet()` sets CSP, X-Frame-Options, HSTS, X-Content-Type-Options, etc.
-
----
-
-## Production deployment (Render)
-
-Both services deployed on Render.
-
-**Backend (Web Service):**
-- Build command: `npm install`
-- Start command: `node app.js`
-- Health check path: `/health`
-- Env vars to set: `OPENAI_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend Render URL)
-
-**Frontend (Static Site or Web Service):**
-- Build command: `npm run build`
-- Publish directory (static): `out/` — requires `output: 'export'` in `next.config.js`
-- Or deploy as Web Service with start command: `npm start`
-- Env var to set: `NEXT_PUBLIC_API_BASE_URL` (set to the backend Render URL)
-
----
+| Var | Where | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | backend | Required. `backend/.env` locally, Render env in production. Never in the frontend. |
+| `ANTHROPIC_MODEL` | backend | Optional. |
+| `ALLOWED_ORIGINS` | backend | Required. Comma-separated, never `*`. |
+| `PORT` | backend | 3000 locally; injected by Render. |
+| `NEXT_PUBLIC_API_BASE_URL` | frontend | Baked in at build time. |
 
 ## What not to do
 
-- Do not add database integration. The schema in `database/schema.sql` is a dead artifact.
-- Do not add `JWT_SECRET` or auth middleware. There is no user system and none is planned.
-- Do not re-add `pg` or `jsonwebtoken` to `backend/package.json`.
-- Do not use `openai.responses.create` in `chat.js` or `openai.chat.completions.create` in `callWrapper.js` — they use different APIs intentionally.
-- Do not set `ALLOWED_ORIGINS` to `*` or leave it empty. CORS is intentionally fail-closed.
-- Do not commit `backend/.env` or `frontend/.env`. Both are gitignored.
+- Don't add a database, auth, `pg` or `jsonwebtoken`.
+- Don't call the Anthropic SDK outside `lib/claudeClient.js`.
+- Don't put secrets in `NEXT_PUBLIC_*` variables or commit `.env` files (`frontend/.env.example` is committed on purpose).
+- Don't loosen CORS (`*` or an empty allow-list) or remove `trust proxy`.
+- Don't change the `QuoteAnalysis` shape on one side without the other (backend `normalizeAnalysis` ↔ frontend `lib/quoteTypes.ts`).

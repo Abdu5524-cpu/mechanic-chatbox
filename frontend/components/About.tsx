@@ -1,22 +1,30 @@
 export default function About() {
   return (
-    <section className="max-w-4xl mx-auto px-4 py-10">
-      <h2 className="text-4xl font-bold mb-4">About Us</h2>
-      <p className="text-lg mb-6 leading-relaxed">
-        Welcome to Awais Auto Repair & Tire Shop! We are dedicated to providing honest, reliable, 
-        and affordable automotive services. Our mission is to ensure that every customer 
-        drives away with peace of mind and a car that runs like new.
-      </p>
-      <p className="text-lg mb-6 leading-relaxed">
-        Our team consists of certified mechanics with years of hands-on experience, 
-        and we use top-quality parts and the latest technology to deliver exceptional 
-        results every time.
-      </p>
-      <p className="text-lg leading-relaxed">
-        Whether you’re here for a routine check-up, a repair, or just to get an honest 
-        second opinion, we’re here to help.
-      </p>
+    <section
+      aria-labelledby="about-heading"
+      className="rounded border border-saffron/45 bg-white px-6 py-7 shadow-[0_2px_16px_rgba(13,36,100,0.06)] sm:px-8"
+    >
+      <div className="mb-5 flex items-center gap-3">
+        <div className="h-7 w-1 flex-none rounded-sm bg-firoza" />
+        <h2 id="about-heading" className="m-0 text-2xl font-bold text-lapis">
+          What This Is
+        </h2>
+      </div>
+      <div className="space-y-4 text-base leading-7 text-ink">
+        <p>
+          QuoteCheck AI helps vehicle owners make sense of repair estimates. Paste any mechanic quote (cars, trucks,
+          motorcycles) and it returns a structured breakdown, the typical price range for that repair, and a
+          plain-language risk read.
+        </p>
+        <p>
+          Prices are researched live on the web for your region, so you know whether a quote is in the ballpark
+          before you sign anything. No up-selling and no shop affiliation: just a second opinion.
+        </p>
+        <p>
+          It works best when you include the vehicle year, make, and model; the specific damage or service; your city
+          or region; and the total quoted.
+        </p>
+      </div>
     </section>
   )
 }
-

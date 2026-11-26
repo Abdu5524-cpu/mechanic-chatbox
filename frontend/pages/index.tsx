@@ -1,2 +1,1 @@
-
-export { default } from '../44chat'
+export { default } from '../components/ChatPage'

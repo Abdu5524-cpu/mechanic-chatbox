@@ -1,229 +1,116 @@
-# Mechanic Chatbox
+# QuoteCheck AI
 
-**AI-powered auto repair quote analyzer.** Paste or describe a mechanic's estimate — vehicle, damage, location, price — and get back a structured breakdown: parsed quote data, a typical price range for that repair, a risk assessment (LOW / MEDIUM / HIGH), and actionable recommendations.
+[![CI](https://github.com/Abdu5524-cpu/mechanic-chatbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Abdu5524-cpu/mechanic-chatbox/actions/workflows/ci.yml)
 
-**Live:** https://mechanic-frontend.onrender.com
+**Is your repair quote fair?** Paste a mechanic's estimate in plain language. Claude parses it, researches what that repair typically costs in your area with live web search, and returns a structured verdict: the typical price range, where your quote falls in it, a LOW / MEDIUM / HIGH risk rating, and concrete next steps.
 
----
+**Live demo:** https://mechanic-frontend.onrender.com. It runs on Render's free tier, so the first request after an idle period can take about 30 seconds.
 
-## What It Does
+![QuoteCheck AI showing a quote analysis](docs/screenshot.png)
 
-Most people have no reference point when they receive a repair quote. This tool closes that gap:
+## How it works
 
-1. You describe the job in plain language or paste a quote verbatim
-2. The backend parses it into structured data using GPT-4.1 via the OpenAI Responses API
-3. It estimates what that repair typically costs in your region using a second pass with live web search
-4. It assesses the risk level of the quote and returns specific reasons and recommendations
+```
+Browser (Next.js static site)
+  └─ POST /api/analyzeQuote { userText }
+       Express API
+         ├─ origin allow-list (403 before any work) → rate limit → input guardrails
+         ├─ regex extraction: quoted total, currency, location hint
+         └─ Claude (one call)
+              ├─ web_search tool: researches typical local prices
+              └─ submit_quote_analysis tool: returns the JSON contract
+                   (retries once with the tool forced if search is unavailable)
+       ← normalized analysis → result card with risk badge and price-range bar
+```
 
----
+## Engineering decisions
 
-## Tech Stack
+- **Structured output through a tool schema.** The response contract is a tool's `input_schema`, so the model returns typed JSON rather than prose that has to be parsed. The server also normalizes the result (range ordering, enum fallback, null-safe numbers) so the UI never has to handle malformed output.
+- **Search first, with a fallback.** The first pass offers web search plus the submit tool (`tool_choice: auto`), so the model can research local prices before answering. If search is unavailable, errors, or the model never submits, a second pass forces the tool without search, so the user still gets an answer. A paused search turn is resumed rather than thrown away.
+- **The model reads the quote; regex is a backstop.** The model's quoted total wins because it reads the whole text. Regex extraction is a fallback and a hint, with guards so a model year ("Quote for 2019 Civic"), a count or a duration is never read as a price.
+- **Quote text is treated as data.** User input is fenced in `<quote>` tags (any tags the user typed are stripped) and the system prompt tells the model to ignore instructions inside it.
+- **Spend protection.** Disallowed browser origins get a 403 before any LLM call. Rate limiting is per client IP (with `trust proxy` behind Render), a site-wide daily cap (`DAILY_REQUEST_CAP`, default 200) bounds the total, and inputs are capped at 4,000 characters.
+- **The API key stays on the server.** The frontend is a static export with no secrets, and only the backend holds `ANTHROPIC_API_KEY`.
+
+## Tech stack
 
 | Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15, React 18, Tailwind CSS v4, Framer Motion |
-| Backend | Node.js, Express 4, OpenAI SDK v5 |
-| AI | GPT-4.1 (Responses API) for structured parsing, GPT-4o (Chat Completions) for conversation |
-| Hosting | Render (backend Web Service + frontend Static Site) |
+|---|---|
+| Frontend | Next.js (static export), React 19, Tailwind CSS v4, Framer Motion |
+| Backend | Node 22, Express 4, Anthropic SDK |
+| AI | Claude (`claude-sonnet-5` by default) with the web search tool |
+| Quality | Vitest, Supertest, ESLint, TypeScript, GitHub Actions |
+| Hosting | Render (Web Service + Static Site) |
 
----
+## Run locally
 
-## Architecture
-
-```
-frontend/          Next.js app — chat UI, theme switcher, quote formatting
-backend/
-  app.js           Express server — helmet, CORS, rate limiting, startup validation
-  intentrouter.js  Route definitions
-  controllers/     chat.js — GPT-4o chat completions endpoint
-  features/
-    analyzeQuote/  Controller → Service → Parser pipeline
-  lib/
-    callWrapper.js OpenAI Responses API wrapper with 30s timeout
-```
-
-**Request pipeline for `/api/analyzeQuote`:**
-```
-User input
-  → Input guardrails (length cap, sanitization)
-  → quoteParser → GPT-4.1 structured JSON output
-  → estimateQuoteRange → GPT-4.1 with web search (if range not returned)
-  → Formatted response to frontend
-```
-
----
-
-## Security
-
-- **CORS** fails closed — no allowed origins configured means all cross-origin requests are denied
-- **Rate limiting** — 20 requests per 15 minutes per IP
-- **Input guardrails** — 4,000 char max, 10 char min, control character stripping
-- **Startup validation** — server refuses to start if required env vars are absent
-- **Security headers** — `helmet` sets CSP, HSTS, X-Frame-Options, and more
-- **Request size limit** — `express.json({ limit: "10kb" })`
-- **30-second timeout** on all OpenAI calls via `AbortController`
-
----
-
-## Local Development
-
-### Prerequisites
-- Node.js 18+
-- An OpenAI API key with access to GPT-4.1 and GPT-4o
-
-### 1. Clone and install
+Prerequisites: Node 20+ and an Anthropic API key from https://console.anthropic.com/settings/keys (web search must be enabled for your org).
 
 ```bash
-git clone https://github.com/your-username/resume-project.git
-cd resume-project
+git clone https://github.com/Abdu5524-cpu/mechanic-chatbox.git
+cd mechanic-chatbox
 
-cd backend && npm install
-cd ../frontend && npm install
+cp backend/.env.example backend/.env     # then set ANTHROPIC_API_KEY
+cp frontend/.env.example frontend/.env   # points the UI at http://localhost:3000
+
+cd backend && npm install && npm run dev      # API on :3000
+cd ../frontend && npm install && npm run dev  # UI on :3001
 ```
 
-### 2. Configure the backend
+Open http://localhost:3001.
+
+## Tests
 
 ```bash
-cp backend/.env.example backend/.env
+cd backend && npm test                     # API, security middleware, extractors, Claude client, parser
+cd frontend && npm test && npm run lint && npm run typecheck
 ```
 
-Edit `backend/.env`:
-```
-OPENAI_API_KEY=sk-...
-ALLOWED_ORIGINS=http://localhost:3001
-PORT=3000
-```
+## API
 
-`OPENAI_API_KEY` and `ALLOWED_ORIGINS` are required — the server will not start without them. `PORT=3000` keeps the backend off the same port as the frontend (`3001`). On Render, `PORT` is injected automatically and overrides this.
+`POST /api/analyzeQuote` with `{ "userText": "2019 Honda Civic, front bumper crack and repaint. San Diego, CA. Shop quoted $1,800." }`
 
-### 3. Configure the frontend
-
-```bash
-cp frontend/.env.example frontend/.env
-```
-
-`frontend/.env` already contains `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000` which points to the backend.
-
-### 4. Run
-
-```bash
-# Terminal 1 — backend
-cd backend && npm start
-
-# Terminal 2 — frontend
-cd frontend && npm run dev
-```
-
-Open **http://localhost:3001**
-
----
-
-## API Reference
-
-### `POST /api/analyzeQuote`
-
-Parses a free-text repair description into structured data and returns a risk analysis.
-
-**Request**
-```json
-{ "userText": "2019 Honda Civic, front bumper crack and paint, San Diego CA. Shop quoted $1,800." }
-```
-
-**Constraints:** `userText` must be a non-empty string between 10 and 4,000 characters.
-
-**Response**
 ```json
 {
   "success": true,
   "parsed": {
     "parsedQuote": {
       "vehicle": { "make": "Honda", "model": "Civic", "year": "2019" },
-      "damages": ["front bumper crack", "paint damage"],
+      "damages": ["front bumper crack"],
       "location": { "city": "San Diego", "stateOrRegion": "CA" },
-      "services": ["bumper replacement", "paint repair"],
+      "services": ["bumper repair", "repaint"],
       "quoteTotal": 1800,
+      "currency": "USD",
       "quoteRangeMin": 900,
       "quoteRangeMax": 1600,
-      "currency": "USD",
-      "shopName": null
+      "shopName": null,
+      "notesFromUser": null
     },
     "riskLevel": "MEDIUM",
-    "reasons": ["Quote is above typical range for this repair in this region."],
-    "recommendations": ["Get a second quote from another shop.", "Ask for a line-item breakdown."]
+    "reasons": ["The quote is about 12% above the typical $900–$1,600 range for this repair in San Diego."],
+    "recommendations": ["Ask for an itemized parts and labor breakdown.", "Get a second quote."]
   }
 }
 ```
 
-**Error responses**
-
 | Status | Meaning |
-|--------|---------|
-| 400 | `userText` missing, too short, or too long |
-| 429 | Rate limit exceeded |
-| 502 | Upstream parsing failed |
-| 500 | Unexpected server error |
+|---|---|
+| 400 | `userText` missing, under 10 or over 4,000 characters, or the body is malformed |
+| 403 | Browser origin not in `ALLOWED_ORIGINS` |
+| 429 | Rate limit (20 requests / 15 min) |
+| 502 | Analysis failed upstream (generic message; details are in the server logs) |
 
----
-
-### `POST /api/chat`
-
-General-purpose chat endpoint backed by GPT-4o. Accepts a message history or a raw form payload.
-
-**Request**
-```json
-{ "messages": [{ "role": "user", "content": "What's a fair price for a rear bumper respray?" }] }
-```
-
-**Response**
-```json
-{ "reply": "A rear bumper respray typically ranges from..." }
-```
-
----
-
-### `GET /health`
-
-Returns `{ "status": "ok" }`. Used by Render's health check system.
-
----
+`GET /health` returns `{ "status": "ok" }`.
 
 ## Deployment (Render)
 
-**Backend — Web Service**
+| Service | Settings |
+|---|---|
+| Backend: Web Service | Root `backend`, build `npm ci`, start `node app.js`, health check `/health`, env `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (frontend URL) |
+| Frontend: Static Site | Root `frontend`, build `npm ci && npm run build`, publish `out`, env `NEXT_PUBLIC_API_BASE_URL` (backend URL) |
 
-| Setting | Value |
-|---------|-------|
-| Build command | `npm install` |
-| Start command | `node app.js` |
-| Health check path | `/health` |
-| `OPENAI_API_KEY` | Your OpenAI key |
-| `ALLOWED_ORIGINS` | Your frontend Render URL |
-
-**Frontend — Static Site**
-
-| Setting | Value |
-|---------|-------|
-| Build command | `npm run build` |
-| `NEXT_PUBLIC_API_BASE_URL` | Your backend Render URL |
-
----
-
-## Troubleshooting
-
-**CORS errors in the browser**
-Confirm `ALLOWED_ORIGINS` on the backend includes the exact frontend origin (protocol + domain, no trailing slash).
-
-**Backend won't start**
-The server validates `OPENAI_API_KEY` and `ALLOWED_ORIGINS` at boot. Check the startup log — it will print the exact missing variable.
-
-**429 Too Many Requests**
-You've hit the rate limit (20 requests / 15 minutes). Wait and try again.
-
-**Slow responses**
-The quote analysis pipeline makes two sequential LLM calls. Response time is typically 5–15 seconds depending on OpenAI load.
-
----
+`render.yaml` describes both services, so a fresh setup can use **New → Blueprint**. Secrets are marked `sync: false`, so Render asks for them in its dashboard and they never live in the repo. `NEXT_PUBLIC_API_BASE_URL` is baked in at build time, so redeploy the frontend after changing it. Set a monthly spend limit on the key in the Claude Console.
 
 ## License
 
-See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

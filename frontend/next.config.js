@@ -1,13 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // config options
+  output: "export", // `next build` writes a static site to out/ for Render Static Sites
+  reactStrictMode: true,
 };
 
-module.exports = {
-  webpack: (config) => {
-    config.snapshot = {
-      managedPaths: [],
-    };
-    return config;
-  },
-};
+module.exports = nextConfig;
